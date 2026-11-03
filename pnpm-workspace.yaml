@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: true
+# allow the committed lockfile's freshly published entries on pnpm 12+
+minimumReleaseAge: 0
