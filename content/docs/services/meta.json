@@ -1,0 +1,28 @@
+{
+  "title": "自建服务",
+  "pages": [
+    "---影音与网盘---",
+    "../automated-media-pipeline",
+    "../deploy/jellyfin-emby",
+    "../deploy/openlist",
+    "../deploy/litepan",
+    "../deploy/tgtodrive",
+    "../deploy/alist",
+    "---相册管理---",
+    "../deploy/immich",
+    "../deploy/immich-remote",
+    "../deploy/immich-storage",
+    "../deploy/immich-config",
+    "---知识与效率---",
+    "../deploy/affine",
+    "../deploy/karakeep",
+    "../deploy/hermes",
+    "---智能家居与导航---",
+    "../deploy/homeassistant",
+    "../deploy/homepage",
+    "---容器与服务管理---",
+    "../deploy/komodo",
+    "../deploy/dockge",
+    "../deprecated-homelab-stacks"
+  ]
+}
