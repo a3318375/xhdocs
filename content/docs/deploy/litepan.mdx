@@ -1,0 +1,47 @@
+---
+title: "LitePan"
+description: "PikPak / 115 挂载与媒体整理，需要 FUSE 和 host pid"
+---
+
+用来挂网盘、整理媒体。容器里要跑 FUSE，所以设备、privileged 那几个参数一个都不能少。
+
+| 项 | 值 |
+| --- | --- |
+| 镜像 | `ponphil/litepan:beta` |
+| 端口 | 5211（Web）、42069/tcp + udp（Magnet 监听） |
+| 数据 | `/volume3/docker/file/stacks/litepan/data` |
+| STRM | 直接写进 Emby 的 `media/strm` |
+
+## compose
+
+```yaml
+services:
+  litepan:
+    image: ponphil/litepan:beta
+    container_name: litepan
+    restart: unless-stopped
+    ports:
+      - "5211:5211"
+      - "42069:42069/tcp"
+      - "42069:42069/udp"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /volume3/docker/file/stacks/litepan/data:/app/data
+      - /volume3/docker/file/stacks/emby/media/strm:/app/strm
+      - /volume3/docker/file/stacks/litepan/mounts:/app/mounts:shared
+    devices:
+      - /dev/fuse:/dev/fuse
+    pid: "host"
+    privileged: true
+```
+
+## 注意
+
+- `mounts` 目录必须带 `:shared`。容器里会再挂一层 FUSE，传播属性不对就直接挂不上或者看不到内容。
+- 42069 是内置 Magnet 的 TCP/uTP/DHT 监听口，在后台改过端口，这里三条映射要跟着一起改，漏 udp 会连不上。
+- 可选把 FUSE 读缓存单独映射到更快的盘，默认在 `/app/data` 下面，和数据库混在一起。
+
+## 顺手
+
+想给 TMDB 走反代的话，可以在程序里「目录整理 → TMDB 设置」填反代主域名（会自动补 `/3` 和 `/t/p`），比改 hosts 干净。

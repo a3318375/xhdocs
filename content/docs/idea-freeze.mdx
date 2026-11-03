@@ -1,0 +1,65 @@
+---
+title: "IDEA 莫名卡死的一次排查"
+description: "卡在索引、插件、还是 JVM 参数上：一份从上到下的定位顺序"
+---
+
+IDEA 卡住不动，第一反应是重装，但重装往往白费——配置和索引都在用户目录，重装不动它们。
+
+## 先分清是卡还是慢
+
+- 界面能点、只是转圈：多半在跑索引或后台任务，看右下角进度条。
+- 界面完全无响应、任务管理器里 CPU 或内存打满：JVM 层面出问题了。
+- 启动就卡在欢迎页：插件或缓存。
+
+## 按这个顺序查
+
+### 1. 看日志
+
+`Help → Show Log in Explorer`，先翻 `idea.log` 最后几十行。常见关键字：
+
+```text
+OutOfMemoryError
+GC overhead limit exceeded
+PluginException
+Indexing
+```
+
+`OutOfMemoryError` 直接说明堆不够，跳到第 3 步。
+
+### 2. 禁用插件二分
+
+`Settings → Plugins` 里把第三方插件全关，重启。不卡了，就一半一半往回开，几轮就能定位。翻译、AI 补全、主题这几类插件最容易拖慢启动。
+
+### 3. 调 JVM 参数
+
+`Help → Edit Custom VM Options`：
+
+```text
+-Xms1024m
+-Xmx4096m
+-XX:ReservedCodeCacheSize=1024m
+```
+
+`-Xmx` 给到物理内存的一半左右，别超过 8G——堆太大 GC 停顿反而更长。改完重启。
+
+### 4. 清缓存
+
+```text
+File → Invalidate Caches → Invalidate and Restart
+```
+
+索引损坏的典型症状是「某个类明明存在却标红」「跳转跳到别处」，清缓存能修好。
+
+## 绿色版/破解版的老问题
+
+用非官方渠道的包，`vmoptions` 里常被塞了 `-javaagent`。一旦 `-javaagent` 指向的 jar 路径失效或者和新版本不兼容，IDEA 会在启动阶段卡死，日志里通常是 `java.lang.instrument` 相关异常。
+
+```text
+打开 idea64.exe.vmoptions，把 -javaagent:... 那行删掉再启动
+```
+
+同样的思路适用于任何「改了配置就起不来」的情况：先把非官方的东西摘干净，再谈别的原因。
+
+## 我的结论
+
+那次卡死最后定位到 vmoptions 里的 `-javaagent` 指向了一个已删除的 jar。不是内存，不是插件，也不是项目太大——所以先看日志，别先怀疑自己代码。

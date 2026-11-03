@@ -1,0 +1,37 @@
+---
+title: "OpenList"
+description: "网盘聚合 + 内置 aria2，端口 5244，数据在 /volume3/data"
+---
+
+NAS 上的网盘聚合入口，也是离线下载的落点。镜像自带 aria2c，不用再单独起一个下载容器。
+
+| 项 | 值 |
+| --- | --- |
+| 镜像 | `openlistteam/openlist:v4.2.3-aria2` |
+| 端口 | 5244 |
+| 数据 | `/volume3/docker/file/stacks/openlist/data` |
+| 共享盘 | `/volume3/data` → `/data` |
+
+## compose
+
+```yaml
+services:
+  openlist:
+    image: 'openlistteam/openlist:v4.2.3-aria2'
+    container_name: openlist
+    user: 0:0
+    volumes:
+      - /volume3/docker/file/stacks/openlist/data:/opt/openlist/data
+      - /volume3/data:/data
+    ports:
+      - '5244:5244'
+    environment:
+      - UMASK=022
+    restart: unless-stopped
+```
+
+## 注意
+
+- 容器里只映射了 `/volume3/data`，所以往 aria2 里丢任务时路径要写 `/data/...`，对应宿主 `/volume3/data/...`。写宿主路径会直接提示找不到文件。
+- `user: 0:0` 是为了让下载落盘的文件权限和宿主一致，不加的话容易出现权限对不上、Emby 读不到。
+- 端口和 AList 完全冲突，两个不能同时起；现在跑的是 OpenList，[AList](/docs/deploy/alist) 只是留档。

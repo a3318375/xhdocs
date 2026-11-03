@@ -1,0 +1,22 @@
+---
+title: "JPA 懒加载那点事"
+description: "LazyInitializationException 的几种成因和解法"
+---
+
+## 前言
+
+之前说过，我为什么要用jpa，为什么逐渐不太喜欢mybatis。  
+原因就那么几个：讨厌xml，sql难于维护，废弃sql不好删除不好改。  
+当然，之前jpa也有被人诟病的地方，例如：sql效率低，自定义返回的支持不是很好。  
+但是，为什么效率低？怎么才能更好的支持自定义返回？这是我们今天讨论的目标。
+
+## 懒加载
+
+@OneToMany(cascade=CascadeType.ALL,fetch = FetchType.LAZY)这是懒加载常用注解，OneToMany表示两个表一对多关联，cascade=CascadeType.ALL表示，主表删除，关联表也会删除。而fetch = FetchType.LAZY就代表着懒加载。  
+和我一样用spring boot全家桶的人，可能会和我抱有一样的疑问：懒加载是在需要的地方再去加载。  
+那什么是需要的地方？ 返回的时候还是返回了所有属性？怎么才能只返回主表？
+
+## 解释和解决
+
+主要是因为spring boot的jackjson序列化对象的时候，会触发全部加载。  
+所以我的做法是，先查询，然后赋值新的对象。这样在返回的时候，就不会触发关联查询。

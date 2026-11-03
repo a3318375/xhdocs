@@ -1,0 +1,23 @@
+---
+title: "Feign 重复调用与 JPA 反序列化"
+description: "一次请求发两遍、实体字段丢了的排查过程"
+---
+
+## feign反序列
+
+```
+feign:  
+	autoconfiguration:  
+		jackson:  
+			enabled: true
+```
+
+在使用jpa后，jpa的分页会反序列化失败，在调用放使用如上代码，可以解决。
+
+## feign重复调用的问题
+
+​`The bean 'inyaa-admin.FeignClientSpecification' could not be registered.A bean with that name has already been defined and overriding is disabled.`
+
+一般报错如上，这个意思是@FeignClient注解，对于一个项目，只能引入一次
+一般通过spring.main.allow-bean-definition-overriding\=true来解决。
+我本人解决的方式是，一个项目只写一个service。

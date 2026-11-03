@@ -1,0 +1,36 @@
+---
+title: "AList（旧配置）"
+description: "换掉之前的配置留档，端口和 OpenList 冲突"
+---
+
+AList 是这套网盘聚合的前身，现在由 [OpenList](/docs/deploy/openlist) 顶上。配置留着，是防哪天想退回去。
+
+| 项 | 值 |
+| --- | --- |
+| 镜像 | `xhofe/alist:latest-aio` |
+| 端口 | 5244（和 OpenList 冲突） |
+| 数据 | `/volume3/docker/file/stacks/alist/data` |
+
+## compose
+
+```yaml
+services:
+  alist:
+    image: 'xhofe/alist:latest-aio'
+    container_name: alist
+    user: 0:0
+    volumes:
+      - /volume3/docker/file/stacks/alist/data:/opt/alist/data
+      - /volume3/data:/data
+    ports:
+      - '5244:5244'
+    environment:
+      - UMASK=022
+    restart: unless-stopped
+```
+
+## 注意
+
+- 和 OpenList 端口一模一样，切换前先 `docker compose down` 掉另一个。
+- 目录里如果还留着 `compose.yaml.bak-*` 这种备份，注意别把它当成正在用的那份——AList 的备份和 OpenList 的现役配置长得几乎一样，只差镜像名。
+- 换掉的原因记在[Homelab 服务栈换血记录](/docs/deprecated-homelab-stacks)。

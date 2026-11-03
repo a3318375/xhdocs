@@ -1,0 +1,35 @@
+---
+title: "机械盘休眠与唤醒排查（Debian）"
+description: "怎么确认机械盘到底有没有休眠、谁在把它唤醒，以及 hdparm + systemd 的持久化配置"
+---
+
+机械盘一直转不停，是自建 NAS 最常见的隐形电费。这里只记两件事：怎么确认它到底有没有睡，怎么让它睡下去。
+
+## 先判断状态
+
+- `hdparm -C /dev/sdX` —— 能区分 `active/idle` 和 `standby`，这是最直接的判据。
+- `/sys/block/sdX/stat` —— 看写入计数器还在不在涨，涨就是在被写。
+- `ps -e -o pid,comm,wchan:40 | grep -E 'ext4lazyinit|jbd2/sd'` —— 找出 ext4 的 lazy init 和日志线程。
+- `fuser -vm /mnt/hdd1` —— 区分是用户进程在动盘，还是内核在动盘。
+
+## 最容易误判的一件事
+
+新格完 ext4 之后，`ext4lazyinit` 会让盘持续活跃好几个小时。这是一次性的后台 inode 初始化，不是「有服务在乱写」。
+
+这时候反复手动强制 standby，只会白白增加启停次数，问题一点没解决。等它跑完再看，往往就正常了。
+
+## 持久化设置
+
+```sh
+hdparm -S 241 /dev/disk/by-id/ata-XXXX   # 30 分钟无访问后休眠
+```
+
+- 用 oneshot 的 systemd service，开机时按 `/dev/disk/by-id/` 的稳定路径套用超时，别写死 `/dev/sdX`。
+- 再用一个 timer 跑 `hdd-power-watch` 脚本，把状态切换打到 journald（tag `hdd-power`），事后翻日志就能对上「几点几分谁把盘叫醒了」。
+- 读 SMART 别把盘叫醒：`smartctl -A -n standby /dev/sdX`，`-n standby` 就是「睡着就别读」。
+
+## 结论
+
+先分清是 `ext4lazyinit` 这类一次性活动，还是真有常驻服务在扫盘。前者等，后者抓。
+
+相关：[绿联 NAS 迁移 Debian 13 的做法](/docs/ugreen-nas-debian)、[绿联 DXP4800 Plus 硬件备忘](/docs/ugreen-nas-debian)

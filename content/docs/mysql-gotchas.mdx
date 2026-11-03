@@ -1,0 +1,64 @@
+---
+title: "MySQL 一些奇怪的坑"
+description: "字符集、时区、隐式类型转换和 ONLY_FULL_GROUP_BY，四个最常撞上的行为差异"
+---
+
+MySQL 的很多「奇怪」其实是宽松策略：能猜就猜，猜错了也不报错。下面四个是最常见的。
+
+## utf8 不是真 utf8
+
+`utf8` 只支持最多 3 字节，存 emoji 和部分生僻字会直接报 `Incorrect string value`。要真的 UTF-8，用 `utf8mb4`：
+
+```sql
+ALTER TABLE users CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+```
+
+连接串也要跟着改：
+
+```text
+jdbc:mysql://host:3306/db?useUnicode=true&characterEncoding=utf8mb4
+```
+
+只改表不改连接，写入照样被截断。
+
+## 时区
+
+`TIMESTAMP` 存的是 UTC，读的时候按会话时区转换；`DATETIME` 存字面值，不做转换。服务端时区不对，同一行数据在两个客户端能读出相差 8 小时的值。
+
+```sql
+SHOW VARIABLES LIKE '%time_zone%';
+SET time_zone = '+08:00';
+```
+
+Java 侧推荐在连接串里钉死：
+
+```text
+serverTimezone=Asia/Shanghai
+```
+
+## 隐式类型转换
+
+字段是 `varchar`，查询写数字，MySQL 会把整列转成数字比较，索引直接失效：
+
+```sql
+-- phone 是 varchar，下面这句走不了索引
+SELECT * FROM users WHERE phone = 13800138000;
+```
+
+反过来，字段是 `int` 而传了字符串，通常还能走索引，但会带来别的意外（`'1abc'` 被转成 `1` 匹配成功）。规则很简单：类型对齐，别指望 MySQL 帮你猜。
+
+## ONLY_FULL_GROUP_BY
+
+MySQL 5.7 起默认开启，`SELECT` 里出现非聚合、非分组的列会直接报错：
+
+```sql
+-- 报错：name 不在 GROUP BY 里
+SELECT dept_id, name, COUNT(*) FROM emp GROUP BY dept_id;
+```
+
+老代码迁移过来最容易撞上。两种改法：把列加进 `GROUP BY`，或者用 `ANY_VALUE(name)` 明确表示「随便取一个」。关掉这个模式能跑，但语义就不确定了。
+
+## 顺手两个
+
+- 表名大小写：Linux 上 `lower_case_table_names=0`，`User` 和 `user` 是两张表；从 Windows 迁过来经常找不到表。
+- `TIMESTAMP` 上限是 2038-01-19，长期存时间用 `DATETIME`。

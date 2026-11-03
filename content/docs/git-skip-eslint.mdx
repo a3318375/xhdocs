@@ -1,0 +1,50 @@
+---
+title: "提交时跳过 ESLint 校验"
+description: "husky + lint-staged 挡住提交的时候，怎么临时绕过，以及为什么别长期这么干"
+---
+
+前端仓库基本都挂了 `pre-commit` 钩子，改一行文档也会被 ESLint 拦下来。临时绕过很简单，但要知道自己绕的是什么。
+
+## 一次性绕过
+
+```bash
+git commit -m "提交信息" --no-verify
+```
+
+`--no-verify`（简写 `-n`）跳过所有 `pre-commit` 和 `commit-msg` 钩子。只对这一次提交生效，不动仓库配置。
+
+## 钩子长什么样
+
+husky 装完会在 `.husky/pre-commit` 里放一行：
+
+```bash
+npx lint-staged
+```
+
+`lint-staged` 读 `package.json` 里的配置，只对暂存文件跑命令：
+
+```json
+{
+  "lint-staged": {
+    "*.{js,ts,tsx,vue}": ["eslint --fix", "git add"]
+  }
+}
+```
+
+所以拦住你的往往不是 ESLint 本身，而是 `--fix` 之后仍有报错，或者 `git add` 那一步失败。
+
+## 真想跳过时看顺序
+
+1. 先 `npx eslint <file>` 单独跑，确认是真的有错还是配置读错。
+2. 报错是历史遗留文件带来的，用 `--no-verify` 提交，别为了过钩子去改一堆无关代码。
+3. 报错是自己刚写的代码，老老实实修，跳过只是把债推到 CI。
+
+## 不建议的做法
+
+```bash
+git config --unset core.hooksPath   # 别这么干
+```
+
+把 `hooksPath` 清掉等于全仓库禁用钩子，团队里其他人拉下来也没校验了。同样的，`git commit --no-verify` 写进 alias 或者被 IDE 默认勾上，都会让钩子形同虚设。
+
+CI 上的 lint 步骤才是最后一道闸，本地跳过的提交照样会在流水线里挂掉——与其在 CI 上等五分钟，不如本地修完。

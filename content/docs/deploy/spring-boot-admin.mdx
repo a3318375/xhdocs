@@ -1,0 +1,168 @@
+---
+title: "Spring Boot Admin 监控"
+description: "给 Spring Boot 服务加一个监控面板"
+---
+
+## 前言
+
+spring boot admin的监控，主要依托于spring boot的actuator，并且，需要一个独立的服务来运行。  
+它自带一套页面，可定义性还是蛮强的。
+
+## 开始搭建
+
+IDEA自带的创建项目就好，需要勾选的包如下：
+
+- spring-boot-admin-starter-server
+- spring-boot-starter-security（用于自带的UI登陆）
+- spring-boot-starter-web  
+  直接创建项目就OK了。 编码部分 首先在启动类上加 @EnableAdminServer 注解 security
+
+```java
+@Configuration
+public class SecuritySecureConfig extends WebSecurityConfigurerAdapter {
+    private final String adminContextPath;
+
+    public SecuritySecureConfig(AdminServerProperties adminServerProperties) {
+        this.adminContextPath = adminServerProperties.getContextPath();
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        SavedRequestAwareAuthenticationSuccessHandler successHandler = new SavedRequestAwareAuthenticationSuccessHandler();
+        successHandler.setTargetUrlParameter("redirectTo");
+
+        http.authorizeRequests()
+                .antMatchers(adminContextPath + "/assets/**").permitAll()
+                .antMatchers(adminContextPath + "/login").permitAll()
+                .anyRequest().authenticated()
+                .and()
+                .formLogin().loginPage(adminContextPath + "/login").successHandler(successHandler).and()
+                .logout().logoutUrl(adminContextPath + "/logout").and()
+                .httpBasic().and()
+                .csrf().disable();
+    }
+}
+
+```
+
+## application.yml
+
+```yml
+server:
+  port: 8769
+spring:
+  security:
+    user:
+      name: test
+      password: <已打码>
+
+
+bg-type: dingding
+
+```
+
+其实到这里就能登陆了，直接访问localhost:8769就好。
+
+## 客户端
+
+需要引入admin-client包我就不说了，大家自己找。  
+yml需要加入的配置如下
+
+```yml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: ALWAYS
+    logfile:
+      external-file: ./log/sctg_log/sql.log
+spring:
+  application:
+    name: test
+  boot:
+    admin:
+      client:
+        url: http://192.168.1.35:8769
+        username: test
+        password: <已打码>
+        instance:
+          service-host-type: ip
+
+```
+
+如果有shiro，请放开/actuator/** 和 /instances/**。
+
+## 通知
+
+通知主要是钉钉和企业微信，建个群，群设置里有机器人设置。
+
+大家看代码，不要照抄，理解核心在哪就好了。
+
+```java
+public class NotifierService extends AbstractStatusChangeNotifier {
+
+    @Resource
+    private ApplicationContext applicationContext;
+    @Value("${bg-type}")
+    private String bgType;
+
+    public NotifierService(InstanceRepository repository) {
+        super(repository);
+    }
+
+    @Override
+    protected Mono<Void> doNotify(InstanceEvent event, Instance instance) {
+        Map<String, MsgSendService> map = applicationContext.getBeansOfType(MsgSendService.class);
+
+        String serviceName = instance.getRegistration().getName();
+        String serviceUrl = instance.getRegistration().getServiceUrl();
+        String status = instance.getStatusInfo().getStatus();
+        Map<String, Object> details = instance.getStatusInfo().getDetails();
+        StringBuilder str = new StringBuilder();
+        str.append("监控报警 : 【").append(serviceName).append("】");
+        str.append("【服务地址】").append(serviceUrl);
+        str.append("【状态】").append(status);
+        str.append("【详情】").append(JSONObject.toJSONString(details));
+        return Mono.fromRunnable(() -> {
+            map.get(bgType + "MsgSendService").sendMsg(str.toString());
+        });
+    }
+}
+
+```
+
+这里值得注意的是，监控报警4个字是必备的，因为企业微信和钉钉的机器人通知，触发条件，都是关键词和一个带token的链接，没有关键词，消息是发不出去的
+
+```java
+@Service
+public class DingdingMsgSendService implements MsgSendService {
+
+    public void sendMsg(String msg) {
+        String tokenUrl = "https://oapi.dingtalk.com/robot/send?access_token=xxxxx";
+
+        try {
+            Message message = new Message();
+            message.setMsgtype("text");
+            message.setText(new MessageInfo(msg));
+
+            RestTemplate restTemplate = new RestTemplate();
+            restTemplate.getMessageConverters().set(1, new StringHttpMessageConverter(StandardCharsets.UTF_8));
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Message> request = new HttpEntity<>(message, headers);
+            String resp = restTemplate.postForObject(tokenUrl, request, String.class);
+
+            System.out.println("sendMsg:" + msg);
+            System.out.println("respMsg:" + resp);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+}
+```
+
+上面是钉钉的消息发送页面。

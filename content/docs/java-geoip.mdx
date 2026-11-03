@@ -1,0 +1,31 @@
+---
+title: "Java 里做 GeoIP 查询"
+description: "用 MaxMind 库把 IP 转成地区"
+---
+
+好像是有兼容性，项目使用jdk8，springboot2.7版本大概
+
+```xml
+<!-- https://mvnrepository.com/artifact/com.maxmind.geoip2/geoip2 -->
+        <dependency>
+            <groupId>com.maxmind.geoip2</groupId>
+            <artifactId>geoip2</artifactId>
+            <version>2.16.1</version>
+        </dependency>
+```
+
+```java
+// 创建 DatabaseReader 实例
+File database = new File(ipAddrFile);
+DatabaseReader dbReader = new DatabaseReader.Builder(database).withCache(new CHMCache()).build();
+// 解析 IP 地址
+//String ipAddress = "1.178.63.255"; // 使用实际IP地址替换这个占位符
+InetAddress inetAddress = InetAddress.getByName(sysAccess.getIpAddr());
+
+// 获取对应 IP 的地理位置信息
+CountryResponse response = dbReader.country(inetAddress);
+
+Country country = response.getCountry();
+```
+
+‍

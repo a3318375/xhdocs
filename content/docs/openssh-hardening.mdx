@@ -1,0 +1,126 @@
+---
+title: "CentOS 下 OpenSSH 批量升级与历史漏洞"
+description: "系统扫出 1 个高危 + 7 个中危，全部指向版本过旧：用 RPM 批量升级修掉，附七个 CVE 的速查表"
+---
+
+老机器上的 OpenSSH 常年不动，等安全扫描一跑，一屏都是 CVE。这篇把「怎么升」和「升之前该知道哪几个洞」放一起。
+
+## 背景
+
+系统扫描发现 1 个高危、7 个中危，原因都是版本过旧。思路不复杂：拿新版 RPM 覆盖安装，保住原配置，出问题能退回去。
+
+## 先把七个 CVE 认一遍
+
+## 漏洞一览
+
+| 编号 | 等级 | 类型 |
+|---|---|---|
+| CVE-2018-15919 | 中危 | 信息泄露 |
+| CVE-2018-20685 | 中危 | 访问控制 |
+| CVE-2019-6109 | 中危 | 访问控制 |
+| CVE-2019-6110 | 中危 | 访问控制 |
+| CVE-2019-6111 | 中危 | 输入验证 |
+| CVE-2020-14145 | 中危 | 信息泄露 |
+| CVE-2021-41617 | 高危 | 权限提升 |
+
+## 逐条
+
+### CVE-2018-15919
+
+OpenSSH 信息泄露漏洞，中危。
+
+- 标签：`[CVE, 中危, OpenSSH, 信息泄露]`
+- 修复：升级到上面对应的修复包版本。
+
+### CVE-2018-20685
+
+OpenSSH 访问控制错误漏洞，中危。
+
+- 标签：`[CVE, 中危, OpenSSH, 访问控制]`
+- 修复：升级到上面对应的修复包版本。
+
+### CVE-2019-6109
+
+OpenSSH 访问控制错误漏洞，中危。
+
+- 标签：`[CVE, 中危, OpenSSH, 访问控制]`
+- 修复：升级到上面对应的修复包版本。
+
+### CVE-2019-6110
+
+OpenSSH 访问控制错误漏洞，中危。
+
+- 标签：`[CVE, 中危, OpenSSH, 访问控制]`
+- 修复：升级到上面对应的修复包版本。
+
+### CVE-2019-6111
+
+OpenSSH 输入验证错误漏洞，中危。
+
+- 标签：`[CVE, 中危, OpenSSH, 输入验证]`
+- 修复：升级到上面对应的修复包版本。
+
+### CVE-2020-14145
+
+OpenSSH 信息泄露漏洞，中危。
+
+- 标签：`[CVE, 中危, OpenSSH, 信息泄露]`
+- 修复：升级到上面对应的修复包版本。
+
+### CVE-2021-41617
+
+OpenSSH 权限提升漏洞，高危。
+
+- 标签：`[CVE, 高危, OpenSSH, 权限提升]`
+- 修复：升级到上面对应的修复包版本。
+
+## 批量升级
+
+### 1. 准备 RPM 包
+
+从 CSDN 那篇文章取的适用于 CentOS 的 OpenSSH RPM 包，版本要和你系统的 glibc、openssl 对得上。
+
+### 2. 备份并确认版本
+
+```bash
+ssh -V
+rpm -qa | grep openssh
+cp -a /etc/ssh /etc/ssh.bak.$(date +%Y%m%d)
+```
+
+### 3. 覆盖安装
+
+```bash
+# 备份配置
+ -f /etc/ssh/sshd_config  && mv /etc/ssh/sshd_config /etc/ssh/sshd_config.$(date +%Y%m%d)
+
+# 批量安装
+yum localinstall -y *.rpm
+
+# 修复密钥权限
+chmod -v 600 /etc/ssh/ssh_host_*_key
+```
+
+### 3. CentOS 7+ 额外处理
+如果 systemd 残留旧的服务文件：
+
+```bash
+if  -d /run/systemd/system && -f /usr/lib/systemd/system/sshd.service ; then
+    mv /usr/lib/systemd/system/sshd.service /usr/lib/systemd/system/sshd.service.$(date +%Y%m%d)
+    systemctl daemon-reload
+fi
+```
+
+### 4. 验证并重启
+
+```bash
+ssh -V && /usr/sbin/sshd -V
+service sshd restart
+```
+
+升级完先别关当前会话，另开一个窗口连一次，确认能登再退。
+
+## 注意
+
+- 覆盖安装会替换 `sshd.service`，原来的 unit 记得留备份，否则 `systemctl` 找不到服务。
+- 升级后 `sshd_config` 里被新版废弃的选项会直接导致启动失败，用 `sshd -t` 先测。

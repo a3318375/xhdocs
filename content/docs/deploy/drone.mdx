@@ -1,0 +1,201 @@
+---
+title: "Drone 部署"
+description: "Drone server 与 runner 的 compose，SCM 对接 Github"
+---
+
+## 前端常见场景：打包后部署到docker
+
+包括最新的nuxt3，他们把node_module都集成到打包文件之内了，所以可以直接用打包文件。
+
+```yml
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: restore-cache
+    image: drillster/drone-volume-cache
+    volumes:
+      - name: cache
+        path: /cache
+    settings:
+      restore: true
+      mount:
+        - ./node_modules
+        - ./yarn.lock
+  - name: build
+    image: node:latest
+    volumes:
+      - name: cache
+        path: /cache
+    commands:
+      - yarn config set registry https://registry.npm.taobao.org
+      - yarn
+      - yarn build
+  - name: rebuild-cache
+    image: drillster/drone-volume-cache
+    volumes:
+      - name: cache
+        path: /cache
+    settings:
+      rebuild: true
+      mount:
+        - ./node_modules
+        - ./yarn.lock
+  - name: docker
+    image: plugins/docker
+    settings:
+      username: xxxx
+      password: <已打码>
+      repo: ccr.ccs.tencentyun.com/inyaa/inyaa-sakura-nuxt
+      registry: ccr.ccs.tencentyun.com
+      tags: latest
+  - name: ssh commands
+    pull: if-not-exists
+    image: appleboy/drone-ssh
+    settings:
+      host: 122.xx.xx.xx
+      username: root
+      password:
+        # 从drone仓库配置中秘密空间读取密码
+        from_secret: ssh_password
+      port: 22
+      # 注意把下面的 springboot-helloworld 改成自己项目mvn pkg会生成的jar包名称
+      script:
+        - echo =======暂停容器=======
+        - docker stop $(docker ps -a  grep "inyaa-sakura-nuxt"  awk '{print $1}')
+        - echo =======暂停旧容器和镜像=======
+        - docker rm -f $(docker ps -a  grep inyaa-sakura-nuxt  awk '{print $1}')
+        - docker rmi $(docker images  grep inyaa-sakura-nuxt  awk '{print $3}')
+        - echo =======开始部署应用=======
+        - docker run -d -p 3000:3000 --name inyaa-sakura-nuxt --network inyaa --network-alias inyaa-sakura-nuxt ccr.ccs.tencentyun.com/inyaa/inyaa-sakura-nuxt:latest
+        - echo =======部署成功=======
+volumes:
+  - name: cache
+    host:
+      path: /tmp/cache
+
+```
+
+image: drillster/drone-volume-cache主要是缓存打包后的文件，加速下次部署。  
+第一次加载缓存，是加速打包。  
+然后yarn build部分是运行打包程序。  
+第二次加载缓存，是把打包之后文件进行缓存更新。  
+最后image: appleboy/drone-ssh是去目标服务器ssh操作。
+
+## 前端常见场景：ssr环境
+
+ssr环境打包，se’rver.js和node_module都是必备的，同时还需要打包。  
+所以配置如下：
+
+```yml
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: docker
+    image: plugins/docker
+    settings:
+      username: xx
+      password: <已打码>
+      repo: ccr.ccs.tencentyun.com/inyaa/inyaa-sakura
+      registry: ccr.ccs.tencentyun.com
+      tags: latest
+  - name: ssh commands
+    pull: if-not-exists
+    image: appleboy/drone-ssh
+    settings:
+      host: 122.xx.xx.xx
+      username: xxx
+      password:
+        # 从drone仓库配置中秘密空间读取密码
+        from_secret: ssh_password
+      port: 22
+      # 注意把下面的 springboot-helloworld 改成自己项目mvn pkg会生成的jar包名称
+      script:
+        - echo =======暂停容器=======
+        - docker stop $(docker ps -a  grep "inyaa-sakura"  awk '{print $1}')
+        - echo =======暂停旧容器和镜像=======
+        - docker rm -f $(docker ps -a  grep inyaa-sakura  awk '{print $1}')
+        - docker rmi $(docker images  grep inyaa-sakura  awk '{print $3}')
+        - echo =======开始部署应用=======
+        - docker run -d -p 5000:5000 --name inyaa-sakura --network inyaa --network-alias inyaa-sakura ccr.ccs.tencentyun.com/inyaa/inyaa-sakura:latest
+        - echo =======部署成功=======
+
+```
+
+这个其实是在dockerfile里打包的，所以直接上传 + 运行就可以了。
+
+## 后端常见场景
+
+后端打包一般只有一个jar，所以比较方便
+
+```yml
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: restore-cache
+    image: drillster/drone-volume-cache
+    volumes:
+      - name: cache
+        path: /cache
+    settings:
+      restore: true
+      mount:
+        - ./.gradle
+  - name: build
+    image: gradle:jdk17
+    commands:
+      - export GRADLE_USER_HOME=./.gradle
+      - gradle init
+      - gradle build
+  - name: rebuild-cache
+    image: drillster/drone-volume-cache
+    volumes:
+      - name: cache
+        path: /cache
+    settings:
+      rebuild: true
+      mount:
+        - ./.gradle
+  - name: docker
+    image: plugins/docker
+    settings:
+      username: xxxx
+      password: <已打码>
+      repo: ccr.ccs.tencentyun.com/inyaa/inyaa-web
+      registry: ccr.ccs.tencentyun.com
+      tags: latest
+  - name: ssh commands
+    pull: if-not-exists
+    image: appleboy/drone-ssh
+    settings:
+      host: 122.xx.xx.xx
+      username: xxxx
+      password:
+        # 从drone仓库配置中秘密空间读取密码
+        from_secret: ssh_password
+      port: 22
+      # 注意把下面的 springboot-helloworld 改成自己项目mvn pkg会生成的jar包名称
+      script:
+        - echo =======暂停容器=======
+        - docker stop $(docker ps -a  grep "inyaa-web"  awk '{print $1}')
+        - echo =======暂停旧容器和镜像=======
+        - docker rm -f $(docker ps -a  grep inyaa-web  awk '{print $1}')
+        - docker rmi $(docker images  grep inyaa-web  awk '{print $3}')
+        - echo =======开始部署应用=======
+        - docker run -d -p 8081:8081 --name inyaa-web --network inyaa --network-alias inyaa-web ccr.ccs.tencentyun.com/inyaa/inyaa-web:latest
+        - echo =======部署成功=======
+volumes:
+  - name: cache
+    host:
+      path: /tmp/cache
+
+```
+
+可以看到，其实和上面差不多了，都是加载缓存，打包，缓存更新，上传私服，然后ssh去运行。
+
+‍

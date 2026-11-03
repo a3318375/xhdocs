@@ -1,0 +1,209 @@
+---
+title: "云服务器重建流程"
+description: "换机时从裸系统到服务全部起来的顺序"
+---
+
+[bin456789/reinstall: 一键DD/重装脚本 (One-click reinstall OS on VPS)](https://github.com/bin456789/reinstall)
+
+先重置
+
+这次选了debian
+
+apt update
+
+apt install -y ca-certificates curl gnupg lsb-release
+
+mkdir /data
+
+mkdir -p /etc/apt/keyrings  
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg  
+echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian  
+   29    `$(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null`
+   30  `echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian`
+   31    `$(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null`
+  
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin  
+  docker --version
+
+docker network create inyaw
+
+mkdir -p /data/nginx/conf.d  
+cd /data/nginx  
+mkdir certs  
+   60  `apt install git`
+   61  `git clone https://gitee.com/neilpang/acme.sh.git`
+   62  `cd acme.sh`
+   63  `./acme.sh --install -m 184608371@qq.com`
+   64  `ls`
+   65  `cd /root/.acme.sh/`
+   66  `ls`
+   67  `apt update && apt install -y socat`
+   68  `source ～/.bashrc`
+   69  `source ～/.bashrc`
+   70  `source /root/.bashrc`
+   71  `acme.sh --version`
+  110  `docker run -d   --name nginx   --restart unless-stopped   -p 80:80   -p 443:443   -v /data/nginx/html:/usr/share/nginx/html:ro   -v /data/nginx/conf.d:/etc/nginx/conf.d:ro   -v /data/nginx/acme-challenge:/var/www/html:rw \  # ← 新增这一行！`
+  111    `-v /data/nginx/certs:/etc/nginx/certs:ro   nginx:alpine`
+  112  `docker run -d   --name my-nginx   --restart unless-stopped   -p 80:80   -p 443:443   -v /data/nginx/html:/usr/share/nginx/html:ro   -v /data/nginx/conf.d:/etc/nginx/conf.d:ro   -v /data/nginx/acme-challenge:/var/www/html:rw   -v /data/nginx/certs:/etc/nginx/certs:ro   nginx:alpine`
+  113  `acme.sh --issue -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  114  `mkdir -p /data/nginx/certs`
+  115  `acme.sh --install-cert -d www.inyaw.com   --key-file       /data/nginx/certs/private.key   --fullchain-file /data/nginx/certs/fullchain.cer   --reloadcmd      "docker exec my-nginx nginx -s reload"`
+  116  `docker ps`
+  117  `vi www.inyaw.com.conf`
+  118  `docker exec my-nginx nginx -s reload`
+  119  `vi www.inyaw.com.conf`
+  120  `docker exec my-nginx nginx -s reload`
+  121  `docker logs my-nginx`
+  122  `docker logs my-nginx`
+  123  `ls -l /data/nginx/html/`
+  124  `vi www.inyaw.com.conf`
+  125  `docker exec my-nginx nginx -s reload`
+  126  `history`
+  127  `docker ps`
+  128  `docker ps`
+  129  `docker rm -f typecho`
+  130  `docker rm -f postgres`
+  131  `docker rm -f my-nginx`
+  132  `docker run --name typecho --network inyaw -p 8888:80 -e TYPECHO_SITE_URL=https://www.inyaw.com -d joyqi/typecho:nightly-php8.2-apache`
+  133  `docker run -d   --name postgres --network inyaw   -e POSTGRES_PASSWORD=<已打码>   -e POSTGRES_USER=inyaw   -e POSTGRES_DB=mydb   -p 5432:5432   postgres`
+  134  `docker run -d   --name nginx --network inyaw   --restart unless-stopped   -p 80:80   -p 443:443   -v /data/nginx/html:/usr/share/nginx/html:ro   -v /data/nginx/conf.d:/etc/nginx/conf.d:ro   -v /data/nginx/acme-challenge:/var/www/html:rw   -v /data/nginx/certs:/etc/nginx/certs:ro   nginx:alpine`
+  135  `docker logs nginx`
+  136  `docker logs nginx`
+  137  `docker logs nginx`
+  138  `docker logs typecho`
+  139  `i www.inyaw.com.conf`
+  140  `vi www.inyaw.com.conf`
+  141  `docker exec nginx nginx -s reload`
+  142  `dockjer ps`
+  143  `docker ps`
+  144  `vi www.inyaw.com.conf`
+  145  `docker exec nginx nginx -s reload`
+  146  `docker exec -it postgres psql -U inyaw -l`
+  147  `docker exec -it postgres psql -U postgres`
+  148  `docker rm -f postgres`
+  149  `docker run -d   --name postgres --network inyaw   -e POSTGRES_PASSWORD=<已打码>   -p 5432:5432   postgres`
+  150  `cd /opt/`
+  151  `ls`
+  152  `mkdir -p /opt/ssl-uploader`
+  153  `apt update && apt install -y python3 python3-pip`
+  154  `cd /opt/ssl-uploader`
+  155  `pip3 install requests`
+  156  `git clone https://github.com/Angel-fund/sslmanage.git`
+  157  `pip install git+https://github.com/Angel-fund/sslmanage.git`
+  158  `python3 -m venv venv`
+  159  `apt install -y python3.13-venv`
+  160  `python3 -m venv venv`
+  161  `source venv/bin/activate`
+  162  `pip install --upgrade pip`
+  163  `pip install git+https://github.com/Angel-fund/sslmanage.git`
+  164  `python -c "from sslmanage import UpCertManager; print('OK')"`
+  165  `vi /opt/ssl-uploader/venv/lib/python3.13/site-packages/sslmanage/__init__.py`
+  166  `cat /opt/ssl-uploader/venv/lib/python3.13/site-packages/sslmanage/__init__.py`
+  167  `vi /opt/ssl-uploader/venv/lib/python3.13/site-packages/sslmanage/__init__.py`
+  168  `source /opt/ssl-uploader/venv/bin/activate`
+  169  `python -c "from sslmanage import UpCertManager; print('OK')"`
+  170  `pip install "urllib3<2"`
+  171  `pip install "requests<2.30"`
+  172  `python -c "from sslmanage import UpCertManager; print('OK')"`
+  173  `exit`
+  174  `history`
+  175  `cd /root/.acme.sh/www.inyaw.com`
+  176  `openssl x509 -in fullchain.cer -text -noout | grep "Subject Alternative Name" -A1`
+  177  `acme.sh --issue -d inyaw.com -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  178  `cd /opt/ssl-uploader/`
+  179  `ls`
+  180  `vi upssl.py`
+  181  `Le_ReloadCmd='/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py --domain inyaw.com --cert_dir /root/.acme.sh/inyaw.com/ --platform upyun'`
+  182  `acme.sh --issue -d inyaw.com -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  183  `cd /data/nginx/`
+  184  `ls`
+  185  `cd conf.d/`
+  186  `ls`
+  187  `vi www.inyaw.com.conf`
+  188  `docker restart nginx`
+  189  `acme.sh --issue -d inyaw.com -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  190  `cat www.inyaw.com.conf`
+  191  `vi www.inyaw.com.conf`
+  192  `docker restart nginx`
+  193  `acme.sh --issue -d inyaw.com -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  194  `cat www.inyaw.com.conf`
+  195  `history`
+  196  `mkdir -p /data/nginx/acme-challenge/.well-known/acme-challenge`
+  197  `acme.sh --issue -d inyaw.com -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  198  `chmod -R a+r /data/nginx/acme-challenge`
+  199  `docker exec nginx nginx -s reload`
+  200  `docker logs nginx`
+  201  `vi www.inyaw.com.conf`
+  202  `mv www.inyaw.com.conf www.inyaw.com.conf_bak`
+  203  `touch inyaw.conf`
+  204  `vi inyaw.conf`
+  205  `docker exec nginx nginx -s reload`
+  206  `acme.sh --issue -d inyaw.com -d www.inyaw.com --webroot /data/nginx/acme-challenge`
+  207  `cd /opt/ssl-uploader/`
+  208  `ls`
+  209  `vi /opt/ssl-uploader/reload-and-upload.sh`
+  210  `chmod +x /opt/ssl-uploader/reload-and-upload.sh`
+  211  `acme.sh --install-cert -d inyaw.com   --key-file       /data/nginx/certs/private.key   --fullchain-file /data/nginx/certs/fullchain.cer   --reloadcmd      "/opt/ssl-uploader/reload-and-upload.sh"`
+  212  `/opt/ssl-uploader/reload-and-upload.sh`
+  213  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  214  `set -x`
+  215  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  216  `vi sslmanage/`
+  217  `ls`
+  218  `vi upssl.py q`
+  219  `vi upssl.py`
+  220  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  221  `export UPYUN_USERNAME="a3318375"`
+  222  `export UPYUN_PASSWORD="<已打码>"`
+  223  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  224  `curl -X POST https://console.upyun.com/api/v1/login/   -H "Content-Type: application/json"   -d '{"email":"a3318375","password":"<已打码>"}'`
+  225  `vi upssl.py`
+  226  `vi upssl.py`
+  227  `vi upssl.py`
+  228  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  229  `vi upssl.py`
+  230  `vi upssl.py`
+  231  `cat upssl.py`
+  232  `vi upssl.py`
+  233  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  234  `vi upssl.py`
+  235  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  236  `cat upssl.py`
+  237  `:q`
+  238  `ls`
+  239  `history`
+  240  `vi upssl.py`
+  241  `history`
+  242  `vi upssl.py`
+  243  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  244  `vi upssl.py`
+  245  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  246  `vi upssl.py`
+  247  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  248  `cd /root/.acme.sh/inyaw.com/`
+  249  `ls`
+  250  `cd /opt`
+  251  `ls`
+  252  `cd ssl-uploader/`
+  253  `ls`
+  254  `vi upssl.py`
+  255  `/opt/ssl-uploader/venv/bin/python3 /opt/ssl-uploader/upssl.py   --domain inyaw.com   --cert_dir /root/.acme.sh/inyaw.com/   --platform upyun`
+  256  `vi /opt/ssl-uploader/upload_upyun.py`
+  257  `chmod +x /opt/ssl-uploader/upload_upyun.py`
+  258  `/opt/ssl-uploader/upload_upyun.py`
+  259  `ls`
+  260  `ls`
+  261  `rm -rf up`
+  262  `ls`
+  263  `rm -rf upload_upyun.py`
+  264  `ls`
+  265  `rm -rf *`
+  266  `ls`
+  267  `git clone git@github.com:monkey-wenjun/migrate_upyun_certificate.git`
+  268  `ls`
+  269  `ls`
+  270  `ls`
+  271  `git clone https://github.com/monkey-wenjun/migrate_upyun_certificate.git`
+  272  `ls`
+  273  `acme.sh --install-cert -d inyaw.com   --key-file /data/nginx/certs/private.key   --fullchain-file /data/nginx/certs/fullchain.cer`
+  274  `history`

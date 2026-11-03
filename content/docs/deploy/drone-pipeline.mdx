@@ -1,0 +1,72 @@
+---
+title: "用 Drone 搭一条流水线"
+description: "从仓库授权到 .drone.yml 跑通第一条流水线"
+---
+
+## drone本身
+
+需要先搭建docker环境。
+
+修改成自己的配置，复制并运行
+
+```bash
+docker run \
+--volume=/var/lib/drone:/data \
+--env=DRONE_GITEA_SERVER=https://git.test.cn \
+--env=DRONE_GITEA_CLIENT_ID=111111111111 \
+--env=DRONE_GITEA_CLIENT_SECRET=<已打码> \
+--env=DRONE_RPC_SECRET=yuxh \
+--env=DRONE_SERVER_HOST=https://drone.test.cn \
+--env=DRONE_SERVER_PROTO=https \
+--env=DRONE_USER_CREATE=username:a3318375,admin:true \
+--publish=9080:80 \
+--publish=9443:443 \
+--restart=always \
+--detach=true \
+--name=drone \
+--network=inyaa \
+drone/drone:2
+```
+
+需要注意的配置：
+
+DRONE_GITEA_SERVER： 这个是我们以前配过的gitea的域名
+
+DRONE_GITEA_CLIENT_ID和DRONE_GITEA_CLIENT_SECRET这两个是gitea里面，点头像-设置-应用，创建的oauth2 应用id和secret  
+default.png  
+default.png
+
+DRONE_RPC_SECRET管道的密钥  
+DRONE_SERVER_HOST drone的域名  
+DRONE_SERVER_PROTO http/https  
+DRONE_USER_CREATE这个配置的是管理员账号，比如我配置的是gitea的账号，如果没有管理员，将会缺失配置  
+9080端口，因为我的80和443给了nginx，所以这里用9080，然后通过nginx代理过去
+
+## drone的docker管道
+
+```bash
+docker run --detach \
+  --volume=/var/run/docker.sock:/var/run/docker.sock \
+  --env=DRONE_RPC_PROTO=https \
+  --env=DRONE_RPC_HOST=drone.test.cn \
+  --env=DRONE_RPC_SECRET=yuxh \
+  --env=DRONE_RUNNER_CAPACITY=2 \
+  --env=DRONE_RUNNER_NAME=inyaa-drone-runner \
+  --publish=3001:3000 \
+  --restart=always \
+  --network=inyaa \
+  --name=runner \
+  drone/drone-runner-docker:1
+```
+
+其他配置都简单易懂了，主要配置的都是drone的，这里重点说这个：
+
+DRONE_RPC_SECRET 可以看到我们配置的是yuxh和drone一样，我的个人理解，这是一个和drone通信的密钥  
+之所以是docker管道，是因为构建的时候，会创建docker容器并构建，构建后会删掉容器
+
+部署后二者缺一不可。  
+成功后其他的都简单易懂了，登陆是通过gitea登陆，当git仓库有项目，drone里面点sync便会同步。
+
+## 自动构建
+
+这个网上能搜的到，我现在没有上传图片功能，稍后再说

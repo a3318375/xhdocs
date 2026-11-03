@@ -1,0 +1,68 @@
+---
+title: "IDEA 代码生成插件"
+description: "用 EasyCode 按自己的模板生成 Entity、Mapper 和 Service，少写点复制粘贴"
+---
+
+新表建完，实体、Mapper、Service、Controller 一套下来就是四五个文件的手工活。IDEA 插件能干这事，关键在模板改成自己项目的样子。
+
+## 选哪个
+
+- **EasyCode**：基于 Database 面板的表结构生成，模板是 Velocity，改起来直观，用得最多。
+- **MyBatisX**：Mapper 和 XML 之间跳转好用，生成能力弱一些。
+- **IDEA 自带 File Template**：只能生成静态骨架，拿不到表字段。
+
+要按表字段生成，EasyCode 够了。
+
+## 配置路径
+
+`Settings → Other Settings → EasyCode → Template Setting`，选中要改的模板（entity / mapper / service / controller / xml），右边直接编辑。
+
+类型映射在 `Type Mapper` 里配，比如：
+
+```text
+varchar   -> java.lang.String
+datetime  -> java.time.LocalDateTime
+bigint    -> java.lang.Long
+tinyint   -> java.lang.Integer
+decimal   -> java.math.BigDecimal
+```
+
+默认映射会把 `datetime` 生成 `java.util.Date`，和现在项目的 `LocalDateTime` 对不上，这块必须改。
+
+## 模板里能用的变量
+
+```text
+## 表名转类名
+#set($entityName = $tool.append($tableInfo.name.substring(0,1).toUpperCase(),
+                                 $tableInfo.name.substring(1)))
+package ${packageName}.entity;
+
+public class $entityName {
+#foreach($column in $tableInfo.fullColumn)
+    private $column.shortType $column.name; // $column.comment
+#end
+}
+```
+
+常用对象：`$tableInfo`（表名、注释、字段列表）、`$packageName`、`$tool`（字符串工具）。
+
+## 一个实际点的实体模板
+
+```text
+#foreach($column in $tableInfo.fullColumn)
+    #if($column.name == "create_time" || $column.name == "update_time")
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    #elseif($column.primaryKey)
+    @TableId(type = IdType.AUTO)
+    #end
+    private $column.shortType $column.name;
+#end
+```
+
+把审计字段的自动填充、主键策略都写进模板，生成出来就能直接用，不用逐个补注解。
+
+## 注意
+
+- 模板改完先拿一张测试表生成，确认包名、import、注解都对，再对生产表批量跑。
+- 生成器不认识你的业务字段语义，枚举、状态码这些还是要手写转换。
+- 覆盖同名文件前看清楚，EasyCode 默认会提示，别一路回车。

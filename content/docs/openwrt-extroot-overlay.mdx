@@ -1,0 +1,52 @@
+---
+title: "OpenWrt extroot overlay（192.168.5.5 双分区叠加）"
+description: "路由器 192.168.5.5（ImmortalWrt 25.12.2，x86/64，J4125 迷你主机）"
+---
+
+## 结构
+
+路由器 192.168.5.5（ImmortalWrt 25.12.2，x86/64，J4125 迷你主机）：
+
+| 分区 | 大小 | 用途 |
+|---|---|---|
+| sda128 | 239K | BIOS boot |
+| sda1 | 32M vfat | `/boot`（grub + vmlinuz，UEFI 启动） |
+| sda2 | 300M ext4 | rootfs（只读层，挂在 `/rom`） |
+| sda3 | 58.7G ext4 | **overlay（extroot）** → `/overlay` |
+| sdb1 | 238G ext4 | `/opt` = docker data-root + 全部容器挂载源（独立物理盘） |
+
+挂载链：preinit 读**内部** `/etc/config/fstab` → 见到
+`config mount 'extroot' → target /overlay / device /dev/sda3 / enable 1`
+→ 把 sda3 挂到 `/overlay` → `overlayfs:/overlay` 作为 `/`（upper = `/overlay/upper`）。
+
+为什么这么装：rootfs 分区只有 300M，放不下 docker / nikki / OpenClash 这类包，所以 overlay 单独给一个 58.7G 分区。
+
+## 重刷陷阱（2026-10-16 实际踩到）
+
+- 官方 `25.12.2 x86/64 generic-ext4-combined-efi` 镜像的 rootfs **没有** `/etc/config/fstab`，分区表里也**没有 p3**。
+- 现有 p1/p2 与镜像完全一致 → `sysupgrade` 默认 `save_partitions=1` → 只重写 sda1 + sda2，**sda3 保留**（这是我们想要的）。
+- **但是**：刷机时配置恢复写回的 `/etc/config/fstab` 是**旧 overlay 里那一份**（overlay 副本会遮住 rootfs 的；而它早于 extroot 建立，没有 extroot 条目）→ preinit 找不到 extroot → 系统直接跑在 sda2 上，sda3 被挂到 `/mnt/sda3`。
+- 症状：`mount` 里没有 `overlayfs:/overlay on /` 这一行；docker / nikki / lucky / 自定义脚本"全部消失"（**数据其实完好**，只是没挂上）；apk 元数据反而是正确的。
+- 修复：把 extroot 条目写到**两处**，然后重启：
+  1. `/etc/config/fstab` —— preinit 阶段读的就是它（在 rootfs 分区上，持久）
+  2. `/overlay/upper/etc/config/fstab` —— 挂上 sda3 之后生效的那份（不写它，第三次开机又会丢）
+- 原始快照：`raw/configs/openwrt-192.168.5.5-fstab-20261016.txt`（两份 sha256 同为 `ed4595ad…`）
+
+## 判断口诀
+
+```sh
+mount | grep -E 'sda3 on /overlay|overlayfs'
+# 两行都有  → 正常
+# 只有 /dev/root on / 且 sda3 在 /mnt/sda3 → extroot 没挂上，按上面修
+```
+
+## 代理现状（2026-10-16 起）
+
+- **nikki**：`config.enabled=1` + 开机自启，smart 核心 `alpha-smart-83e67d0`（`/usr/bin/mihomo`）+ `/etc/nikki/run/Model.bin`，profile = `file:Seven1_fallback_Geo_Smart.yaml`
+- **OpenClash**：`openclash.config.enable=0`（inactive）—— 用户自己关的，保留
+- 两者不能同时跑；备份/恢复件全在 `/opt/upgrade-kit/`（sdb1，重刷不丢）：官方镜像、配置备份 tgz、首次启动脚本、apk 元数据备份、smart 核心与模型、本次执行记录 README
+
+## 相关
+
+- apk 内核/kmod 版本错位（6.12.87 vs 6.12.103）的修法与重刷策略：见 `/opt/upgrade-kit/README-A-20261016.md`
+- 结论：**要"干净"但风险最低的重刷** = 官方镜像 + 默认 `sysupgrade`（保留配置 + 保留分区）+ 事后补 extroot fstab 条目 + 重启

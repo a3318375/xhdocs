@@ -1,0 +1,45 @@
+---
+title: "acme.sh 用腾讯云 DNS 验证签证书"
+description: "泛域名证书自动续期，密钥走环境变量，签完自动 reload nginx"
+---
+
+泛域名证书没法用 HTTP-01 验证，只能走 DNS。腾讯云给的是 `dns_tencent`，用法不难，麻烦的是密钥和续期钩子。
+
+## 装 acme.sh
+
+```bash
+curl https://get.acme.sh | sh -s email=you@example.com
+```
+
+## 填密钥
+
+不要写进脚本，放进 shell 环境或者 acme.sh 的 `account.conf`：
+
+```bash
+export Tencent_SecretId="<你的 SecretId>"
+export Tencent_SecretKey="<你的 SecretKey>"
+```
+
+子账号只要 `QcloudDNSPodFullAccess` 就够，别用主账号密钥。
+
+## 签证书
+
+```bash
+acme.sh --issue --dns dns_tencent -d example.com -d *.example.com
+```
+
+## 装证书并自动 reload
+
+```bash
+acme.sh --install-cert -d example.com \
+  --key-file       /data/nginx/conf.d/ssl/example.com.key \
+  --fullchain-file /data/nginx/conf.d/ssl/example.com_bundle.pem \
+  --reloadcmd     "docker restart nginx"
+```
+
+`--reloadcmd` 只在续期成功后执行，证书换了 nginx 才会重载。
+
+## 注意
+
+- 密钥一旦泄露要立刻在腾讯云控制台禁用，DNS 权限足够把域名指到任何地方。
+- acme.sh 默认 60 天续一次，`acme.sh --list` 能看到下次续期时间。

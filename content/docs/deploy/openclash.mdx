@@ -1,0 +1,28 @@
+---
+title: "OpenClash 从入门到入坟"
+description: "安装、订阅、分流规则与内核选择"
+---
+
+‍
+
+## 原配置
+
+src/gz openwrt_core https://downloads.openwrt.org/releases/24.10.3/targets/x86/64/packages  
+src/gz openwrt_base https://downloads.openwrt.org/releases/24.10.3/packages/x86_64/base  
+src/gz openwrt_kmods https://downloads.openwrt.org/releases/24.10.3/targets/x86/64/kmods/6.6.104-1-3505295dd1edf1c0eda57c9ce372bf57  
+src/gz openwrt_luci https://downloads.openwrt.org/releases/24.10.3/packages/x86_64/luci  
+src/gz openwrt_packages https://downloads.openwrt.org/releases/24.10.3/packages/x86_64/packages  
+src/gz openwrt_routing https://downloads.openwrt.org/releases/24.10.3/packages/x86_64/routing  
+src/gz openwrt_telephony https://downloads.openwrt.org/releases/24.10.3/packages/x86_64/telephony
+
+## 新配置
+
+src/gz openwrt_core `https://mirrors.tuna.tsinghua.edu.cn/openwrt`​/releases/24.10.3/targets/x86/64/packages  
+src/gz openwrt_base `https://mirrors.tuna.tsinghua.edu.cn/openwrt`​/releases/24.10.3/packages/x86_64/base  
+src/gz openwrt_kmods `https://mirrors.tuna.tsinghua.edu.cn/openwrt`​/releases/24.10.3/targets/x86/64/kmods/6.6.104-1-3505295dd1edf1c0eda57c9ce372bf57  
+src/gz openwrt_luci `https://mirrors.tuna.tsinghua.edu.cn/openwrt`​/releases/24.10.3/packages/x86_64/luci  
+src/gz openwrt_packages `https://mirrors.tuna.tsinghua.edu.cn/openwrt`​/releases/24.10.3/packages/x86_64/packages  
+src/gz openwrt_routing `https://mirrors.tuna.tsinghua.edu.cn/openwrt`​/releases/24.10.3/packages/x86_64/routing  
+src/gz openwrt_telephony `https://mirrors.tuna.tsinghua.edu.cn/openwrt`/releases/24.10.3/packages/x86_64/telephony
+
+‍

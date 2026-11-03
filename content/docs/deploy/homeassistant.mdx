@@ -1,0 +1,31 @@
+---
+title: "Home Assistant"
+description: "compose 部署与网络模式选择"
+---
+
+```yaml
+services:
+  homeassistant:
+    image: ghcr.nju.edu.cn/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    network_mode: bridge
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "8123:8123"
+```
+
+## hacs
+
+请注意时效性
+
+执行
+
+​`wget -O - https://get.hacs.xyz | bash -`
+
+重启docker
+
+‍

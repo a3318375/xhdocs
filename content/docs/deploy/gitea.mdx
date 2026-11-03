@@ -1,0 +1,19 @@
+---
+title: "Gitea"
+description: "自建 Git 服务，compose 与初始化设置"
+---
+
+https://docs.gitea.com/zh-cn/installation/install-from-binary
+
+‍
+
+`mkdir -p /data/gitea/{custom,data,log}`  
+chown -R git:git /data/gitea/  
+chmod -R 750 /data/gitea/  
+mkdir /etc/gitea  
+chown root:git /etc/gitea  
+chmod 770 /etc/gitea
+
+‍
+
+​`GITEA_WORK_DIR=/data/gitea/ /usr/local/bin/gitea web -c /etc/gitea/app.ini`

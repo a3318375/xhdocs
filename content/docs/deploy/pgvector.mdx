@@ -1,0 +1,24 @@
+---
+title: "pgvector 向量库"
+description: "Postgres + pgvector 容器，给 RAG 用"
+---
+
+比较低配的选择，主要是考虑和业务共用
+
+```yaml
+services:
+  postgres:
+    image: pgvector/pgvector:pg18-trixie
+    container_name: postgres
+    restart: always
+    network_mode: bridge
+    ports:
+      - 5433:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: <已打码>
+networks: {}
+
+```
+
+标签有很多种，可以独立指定向量库和pg库的版本，感兴趣自己看

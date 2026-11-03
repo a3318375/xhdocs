@@ -1,0 +1,413 @@
+---
+title: "从 smart-doc 到自定义 API 管理"
+description: "解析 OpenAPI 文档，做自己的接口管理"
+---
+
+## 背景
+
+项目用 smart-doc 生成 API 文档，但 smart-doc 默认输出的是静态 HTML 或 Markdown，没法直接集成到后台管理系统里。Knife4j / Swagger UI 需要运行时暴露接口，生产环境不想带那一套。
+
+所以思路是：smart-doc 只负责生成 OpenAPI 规范，我们自己写一个解析器把规范转成自定义的数据结构，存到业务数据库，前端按需展示。
+
+## 生成 OpenAPI 规范
+
+### Maven 插件配置
+
+```xml
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-maven-plugin</artifactId>
+    </plugin>
+    <plugin>
+      <groupId>com.ly.smart-doc</groupId>
+      <artifactId>smart-doc-maven-plugin</artifactId>
+      <version>3.1.2</version>
+      <configuration>
+        <configFile>./src/main/resources/smart-doc.json</configFile>
+        <projectName>${project.description}</projectName>
+      </configuration>
+      <executions>
+        <execution>
+          <phase>compile</phase>
+          <goals>
+            <goal>openapi</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins>
+</build>
+```
+
+smart-doc.json 放到模块的 resources 目录下：
+
+```json
+{
+  "outPath": "src/main/resources/static/doc",
+  "projectName": "SmartDoc Demo",
+  "allInOne": true,
+  "serverUrl": "http://localhost:8080",
+  "packageFilters": "com.zmr.train.controller",
+  "sourceCodePaths": [
+    {
+      "path": "src/main/java",
+      "desc": "Main Source"
+    }
+  ],
+  "customResponseFields": [
+    {
+      "name": "params",
+      "ignore": true
+    }
+  ]
+}
+```
+
+### 泛型返回值要求
+
+smart-doc 要正确解析泛型，返回值类必须写清楚泛型参数：
+
+```java
+@Data
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+public class ApiResult<T> {
+    /** 状态码 */
+    private int code;
+    /** 提示消息 */
+    private String msg;
+    /** 数据内容 */
+    private T data;
+
+    public static <T> ApiResult<T> success(T data) {
+        return new ApiResult<>(200, "操作成功", data);
+    }
+    public static <T> ApiResult<T> error(String msg) {
+        return new ApiResult<>(500, msg, null);
+    }
+}
+
+@Data
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+public class PageDTO<T> {
+    /** 总记录数 */
+    private long total;
+    /** 列表数据 */
+    private List<T> rows;
+    private int code;
+    private String msg;
+}
+```
+
+Controller 返回值这样写 smart-doc 才能正确识别泛型：
+
+```java
+// 普通响应
+@GetMapping("/stats/total")
+public ApiResult<StatsTotalVO> statsTotal(@RequestParam Long courseId) { ... }
+
+// 分页响应
+@PostMapping("/stats/student")
+public ApiResult<PageDTO<StudentStatsVO>> statsStudent(@RequestBody Query query) { ... }
+```
+
+### 生成的 OpenAPI 规范
+
+用 openapi goal 在 IDEA 右侧直接执行，生成的 OpenAPI 3.1.0 大致如下（截取一条接口）：
+
+```json
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "出海项目course模块",
+    "version": "v1.0.0"
+  },
+  "paths": {
+    "/courseInfo/api/stats/total": {
+      "get": {
+        "summary": "statsTotal",
+        "parameters": [
+          { "name": "courseId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": { "$ref": "#/components/schemas/d6ecb03fb627b0072e25b42bc00bfbce" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "d6ecb03fb627b0072e25b42bc00bfbce": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "description": "状态码", "example": 200 },
+          "msg": { "type": "string", "description": "提示消息", "example": "操作成功" },
+          "data": { "$ref": "#/components/schemas/1c2473eb77b19e52e32977bcbc686c6c" }
+        }
+      }
+    }
+  }
+}
+```
+
+每个字段的描述（description）来自 Java 代码里的注释，mock 值来自 @mock 注解。数据结构通过 $ref 互相引用。
+
+## 解析 OpenAPI 规范
+
+### 依赖
+
+```bash
+implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+implementation 'org.springframework.boot:spring-boot-starter-web'
+implementation 'io.swagger.parser.v3:swagger-parser:2.1.20'
+implementation 'com.alibaba.fastjson2:fastjson2:2.0.61'
+compileOnly 'org.projectlombok:lombok'
+runtimeOnly 'com.h2database:h2'
+annotationProcessor 'org.projectlombok:lombok'
+```
+
+核心依赖就一个：swagger-parser。它能把 OpenAPI JSON 解析成 Java 的 OpenAPI 对象模型，剩下的就是遍历和转换。
+
+### 实体设计
+
+```java
+@Setter
+@Getter
+@Entity
+public class DocApi {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    /** 接口名称 */
+    private String name;
+    /** 接口地址 */
+    private String url;
+    /** 调用方式 (GET/POST等) */
+    private String method;
+    /** 认证方式 */
+    private String authMethod;
+
+    /** 请求参数 (Query String) */
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<Map<String, Object>> requestParams;
+
+    /** Body 参数 (JSON 请求体) */
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<Map<String, Object>> bodyParams;
+
+    /** 响应参数 */
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<Map<String, Object>> respParams;
+}
+```
+
+用 JPA 的 JSON 列类型（需要数据库支持，如 PostgreSQL 的 jsonb），参数结构用 `List&lt;Map>` 存，灵活不用建额外关联表。
+
+### 解析核心代码
+
+```java
+public void upload(MultipartFile file) throws IOException {
+    String content = StreamUtils.copyToString(
+        file.getInputStream(), StandardCharsets.UTF_8);
+
+    // 1. 解析 OpenAPI 内容
+    SwaggerParseResult result = new OpenAPIV3Parser()
+        .readContents(content, null, null);
+    OpenAPI openAPI = result.getOpenAPI();
+    Map<String, Schema> allSchemas = openAPI.getComponents().getSchemas();
+
+    List<DocApi> apiList = new ArrayList<>();
+
+    // 2. 遍历 Paths，每个接口转成一个 DocApi
+    openAPI.getPaths().forEach((url, pathItem) -> {
+        pathItem.readOperationsMap().forEach((method, operation) -> {
+            DocApi doc = new DocApi();
+            doc.setName(operation.getSummary());
+            doc.setUrl(url);
+            doc.setMethod(method.name());
+
+            // 2a. 解析 Query 参数
+            doc.setRequestParams(parseParameters(operation.getParameters()));
+
+            // 2b. 解析 Body 参数
+            doc.setBodyParams(parseBodyParams(
+                operation.getRequestBody(), allSchemas));
+
+            // 2c. 解析响应参数（递归展开）
+            doc.setRespParams(parseResponseParams(
+                operation.getResponses(), allSchemas));
+
+            apiList.add(doc);
+        });
+    });
+
+    if (!apiList.isEmpty()) {
+        docApiDao.saveAll(apiList);
+    }
+}
+
+/** 解析 Query 参数 */
+private List<Map<String, Object>> parseParameters(
+        List<Parameter> parameters) {
+    if (parameters == null) return Collections.emptyList();
+    List<Map<String, Object>> result = new ArrayList<>();
+    for (Parameter p : parameters) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("fieldName", p.getDescription());
+        map.put("fieldCode", p.getName());
+        map.put("fieldType", resolveType(p.getSchema()));
+        result.add(map);
+    }
+    return result;
+}
+
+/** 解析 Body 参数（处理 $ref 引用） */
+private List<Map<String, Object>> parseBodyParams(
+        RequestBody requestBody, Map<String, Schema> allSchemas) {
+    if (requestBody == null || requestBody.getContent() == null)
+        return Collections.emptyList();
+
+    MediaType mt = requestBody.getContent().get("application/json");
+    if (mt == null || mt.getSchema() == null)
+        return Collections.emptyList();
+
+    Schema<?> schema = resolveRef(mt.getSchema(), allSchemas);
+    if (schema == null || schema.getProperties() == null)
+        return Collections.emptyList();
+
+    List<Map<String, Object>> result = new ArrayList<>();
+    schema.getProperties().forEach((name, fieldSchema) -> {
+        result.add(extractFieldInfo(name, fieldSchema, null));
+    });
+    return result;
+}
+
+/** 解析响应参数（递归展开嵌套结构） */
+private List<Map<String, Object>> parseResponseParams(
+        ApiResponses responses, Map<String, Schema> allSchemas) {
+    if (responses == null) return Collections.emptyList();
+
+    ApiResponse resp = responses.get("200");
+    if (resp == null || resp.getContent() == null)
+        return Collections.emptyList();
+
+    MediaType mt = resp.getContent().get("application/json");
+    if (mt == null) mt = resp.getContent().get("*/*");
+    if (mt == null || mt.getSchema() == null)
+        return Collections.emptyList();
+
+    List<Map<String, Object>> result = new ArrayList<>();
+    parseSchemaRecursive(mt.getSchema(), allSchemas, result, "");
+    return result;
+}
+
+/**
+ * 递归解析 Schema，展平为带路径前缀的字段列表
+ * 如：data.teachers, data.countryStats[].countryName
+ */
+private void parseSchemaRecursive(Schema<?> schema,
+        Map<String, Schema> allSchemas,
+        List<Map<String, Object>> result, String parentName) {
+    if (schema == null) return;
+
+    schema = resolveRef(schema, allSchemas);
+    if (schema == null || schema.getProperties() == null) return;
+
+    for (Map.Entry<String, Schema> entry :
+            schema.getProperties().entrySet()) {
+        String fieldCode = entry.getKey();
+        Schema<?> fieldSchema = entry.getValue();
+        Schema<?> resolved = resolveRef(fieldSchema, allSchemas);
+
+        String fullName = parentName.isEmpty()
+            ? fieldCode : parentName + "." + fieldCode;
+
+        Map<String, Object> fieldInfo = new HashMap<>();
+        fieldInfo.put("fieldCode", fullName);
+        fieldInfo.put("fieldName", fieldSchema.getDescription() != null
+            ? fieldSchema.getDescription()
+            : (resolved != null ? resolved.getDescription() : ""));
+        fieldInfo.put("fieldType", resolved != null
+            ? resolved.getType() : fieldSchema.getType());
+        result.add(fieldInfo);
+
+        // 对象类型 -> 递归
+        if (resolved != null && "object".equals(resolved.getType())) {
+            parseSchemaRecursive(resolved, allSchemas, result, fullName);
+        }
+        // 数组类型 -> 递归 items
+        else if (fieldSchema instanceof ArraySchema) {
+            Schema<?> itemsSchema =
+                ((ArraySchema) fieldSchema).getItems();
+            // items 可能是 $ref，需要先解引用
+            itemsSchema = resolveRef(itemsSchema, allSchemas);
+            parseSchemaRecursive(
+                itemsSchema, allSchemas, result, fullName + "[]");
+        }
+    }
+}
+
+// ---- 工具方法 ----
+
+/** 获取字段类型，兼容 OpenAPI 3.1 的 types 数组 */
+private String resolveType(Schema<?> schema) {
+    if (schema == null) return "object";
+    if (schema.getType() != null) return schema.getType();
+    if (schema.getTypes() != null && !schema.getTypes().isEmpty())
+        return schema.getTypes().iterator().next();
+    return "object";
+}
+
+/** 解 $ref 引用，返回真实 Schema */
+private Schema<?> resolveRef(Schema<?> schema,
+        Map<String, Schema> allSchemas) {
+    if (schema == null) return null;
+    if (schema.get$ref() != null) {
+        String refName = schema.get$ref()
+            .replace("#/components/schemas/", "");
+        return allSchemas.get(refName);
+    }
+    return schema;
+}
+
+/** 提取字段基本信息 */
+private Map<String, Object> extractFieldInfo(
+        String name, Schema<?> schema, String desc) {
+    Map<String, Object> map = new HashMap<>();
+    map.put("fieldName", name);
+    map.put("description", desc != null ? desc : "");
+    map.put("fieldType", resolveType(schema));
+    return map;
+}
+```
+
+几个关键点：
+
+- **$ref 引用解析**：OpenAPI 规范大量使用$ref 指向 components/schemas，必须用 resolveRef() 把所有引用解掉才能拿到具体字段
+- **OpenAPI 3.1 兼容**：3.1 版本 type 字段改成了 types 数组，resolveType() 做了兼容处理
+- **数组 items 解引用**：ArraySchema 的 items 也可能是个 $ref，需要先解引用再递归
+- **字段路径前缀**：用 data.teachers、data.countryStats[].countryName 这种路径字符串表示字段的层级关系，前端展示时容易解析
+
+## 总结
+
+这套方案的优点是：
+
+1. **生成与解析分离**：smart-doc 只管生成，不侵入运行时
+2. **数据结构自主可控**：存到自己的业务表里，想怎么展示、搜索、关联都方便
+3. **增量更新**：重新生成 OpenAPI JSON 上传即可，不需要重启服务
+
+后续可以考虑的方向：
+
+- 接口版本对比（Diff）：两个版本的 OpenAPI JSON diff，标记新增/废弃/变更的接口
+- 自动化 CI 集成：Maven 编译阶段自动生成，上传到管理平台
+- 接口 Mock 数据生成：基于 OpenAPI schema 的 example 自动生成 Mock 接口

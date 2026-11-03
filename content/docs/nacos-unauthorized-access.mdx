@@ -1,0 +1,56 @@
+---
+title: "Nacos Namespace 未授权访问漏洞"
+description: "默认配置下配置列表可以被匿名拉取，怎么验证、怎么修"
+---
+
+Nacos 老版本默认不开启鉴权，任何人都能直接读配置——里面往往躺着数据库密码和密钥。
+
+## 为什么会有
+
+Nacos 的鉴权默认关闭（`nacos.core.auth.enabled=false`）。开关没开的时候，下面这些接口不需要任何凭据：
+
+```text
+GET /nacos/v1/cs/configs?search=accurate&dataId=&group=&pageNo=1&pageSize=100
+GET /nacos/v1/cs/configs?dataId=xxx.yaml&group=DEFAULT_GROUP
+GET /nacos/v1/ns/instance/list?serviceName=xxx
+```
+
+第一个接口能列出所有配置，第二个直接把内容拉下来。Namespace 只是逻辑隔离，不构成权限边界。
+
+## 怎么验证
+
+```bash
+curl "http://target:8848/nacos/v1/cs/configs?search=accurate&dataId=&group=&pageNo=1&pageSize=10"
+```
+
+返回 `pageItems` 且带配置内容，说明是通的。返回 403 或要求登录，说明已开鉴权。
+
+## 修复
+
+### 1. 打开鉴权
+
+`conf/application.properties`：
+
+```properties
+nacos.core.auth.enabled=true
+nacos.core.auth.system.type=nacos
+nacos.core.auth.plugin.nacos.token.secret.key=<Base64 编码的密钥>
+nacos.core.auth.server.identity.key=<自定义>
+nacos.core.auth.server.identity.value=<自定义>
+```
+
+`token.secret.key` 必须是 Base64，长度够（官方要求 32 字节以上原文）。用默认值等于没改，公开的默认 key 谁都知道。
+
+### 2. 别把 8848 暴露到公网
+
+Nacos 是内网组件。要跨网访问就走 VPN 或者反代加白名单，控制台端口和注册端口都要挡。
+
+### 3. 升级
+
+2.x 后期版本对鉴权和默认配置做了收敛，能升就升。升级前确认客户端版本兼容，老客户端带不了 token。
+
+## 顺带检查
+
+- 控制台默认口令 `nacos/nacos` 有没有改。
+- 配置里有没有明文数据库密码——开鉴权只是挡住匿名访问，配置本身还是明文存的。
+- 有没有人从外部 IP 拉过配置，访问日志里 `Request URI` 带 `/v1/cs/configs` 的都值得看一眼。

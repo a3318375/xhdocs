@@ -1,0 +1,111 @@
+---
+title: "Spring Validation 参数校验"
+description: "@Valid 和 @Validated 的区别、分组校验、嵌套对象，以及校验失败怎么统一返回"
+---
+
+参数校验这件事，麻烦的从来不是写 `@NotNull`，而是分组、嵌套和错误信息怎么统一。
+
+## 两个注解别混用
+
+- `@Valid` 是 JSR-303 标准注解，标在方法参数、字段上，触发级联校验。
+- `@Validated` 是 Spring 的，多了 `groups` 属性，能标在类上做方法级校验。
+
+想让分组生效，就得用 `@Validated`；只校验一个 DTO，`@Valid` 就够。
+
+```java
+@RestController
+@Validated
+public class UserController {
+
+    @PostMapping("/users")
+    public User create(@Valid @RequestBody UserForm form) { ... }
+
+    @PostMapping("/users/batch")
+    public void batch(@Validated(Batch.class) @RequestBody List<UserForm> forms) { ... }
+}
+```
+
+## 分组
+
+新增和修改的校验规则通常不一样：新增时 id 必须为空，修改时必须不为空。
+
+```java
+public interface Create {}
+public interface Update {}
+
+public class UserForm {
+    @Null(groups = Create.class, message = "新增不能带 id")
+    @NotNull(groups = Update.class, message = "修改必须带 id")
+    private Long id;
+
+    @NotBlank(groups = {Create.class, Update.class})
+    private String name;
+}
+```
+
+不写 `groups` 的约束属于 `Default` 组；一旦指定了分组，`Default` 就不会被触发，这点最容易踩。
+
+## 嵌套对象
+
+集合和嵌套对象不会自动校验，必须在字段上加 `@Valid`：
+
+```java
+public class OrderForm {
+    @Valid
+    @NotEmpty
+    private List<ItemForm> items;
+
+    @Valid
+    @NotNull
+    private AddressForm address;
+}
+```
+
+少一个 `@Valid`，里面写再多约束都不生效。
+
+## 自定义注解
+
+```java
+@Target({ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = PhoneValidator.class)
+public @interface Phone {
+    String message() default "手机号格式不对";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+public class PhoneValidator implements ConstraintValidator<Phone, String> {
+    private static final Pattern P = Pattern.compile("^1[3-9]\\d{9}$");
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext ctx) {
+        return value == null || P.matcher(value).matches();
+    }
+}
+```
+
+注意 `isValid` 里对 `null` 要放行，空值交给 `@NotNull` 管，否则两个注解的语义会打架。
+
+## 统一错误返回
+
+```java
+@RestControllerAdvice
+public class ValidationHandler {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handle(MethodArgumentNotValidException e) {
+        Map<String, String> errors = e.getBindingResult().getFieldErrors().stream()
+            .collect(Collectors.toMap(FieldError::getField,
+                f -> Objects.requireNonNullElse(f.getDefaultMessage(), "参数不合法"),
+                (a, b) -> a));
+        return ResponseEntity.badRequest().body(errors);
+    }
+}
+```
+
+方法参数校验失败抛的是 `ConstraintViolationException`，不是上面这个，两个都要接。
+
+## 坑
+
+- `@Validated` 标在类上才会让方法参数上的约束生效，标在方法上没用。
+- 校验发生在参数绑定之后，所以 JSON 结构错了会先抛反序列化异常，压根到不了校验。
+- 分组校验下 `@Valid` 不带 groups，级联进去的还是 `Default` 组。

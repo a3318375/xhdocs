@@ -1,0 +1,38 @@
+---
+title: "WSL 里装 Docker"
+description: "在 WSL 里跑 Docker，以及那些顺手要装的依赖"
+---
+
+‍
+
+sudo apt update && sudo apt install docker.io
+
+sudo usermod -aG docker \$USER
+
+‍
+
+# 1. 安装依赖
+
+sudo apt update  
+sudo apt install -y ca-certificates curl gnupg
+
+# 2. 添加 Docker 官方 GPG 密钥
+
+sudo install -m 0755 -d /etc/apt/keyrings  
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg  
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# 3. 添加 Docker 仓库（支持 noble）
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu$(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 4. 更新并安装
+
+sudo apt update  
+sudo apt install docker-compose-plugin
+
+‍
+
+‍
+
+docker run -d --name immich_ml --gpus all -v ./model-cache:/cache -p 3010:3003 -e NVIDIA_VISIBLE_DEVICES=all ghcr.io/immich-app/immich-machine-learning:release-cuda

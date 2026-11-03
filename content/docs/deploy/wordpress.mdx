@@ -1,0 +1,53 @@
+---
+title: "AlmaLinux 9 装 WordPress"
+description: "LNMP + WordPress 从零到能访问"
+---
+
+## 安装docker
+
+```bash
+sudo dnf repolist
+sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo dnf update
+sudo dnf repolist
+sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+sudo systemctl status docker
+```
+
+## 加速
+
+```bash
+sudo bash -c "$(curl -sSL https://n3.ink/helper)"
+cat /etc/docker/daemon.json
+```
+
+## 安装mysql
+
+```
+docker network create inyaw
+docker run -p 3306:3306 --name mysql --network inyaw  -e MYSQL_ROOT_PASSWORD=password -d mysql:8.0.44
+docker exec -it mysql /bin/bash
+mysql -uroot -ppassword
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%'WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+#sql
+CREATE DATABASE typecho
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_general_ci;
+```
+
+## 安装wordpress
+
+```
+docker run -p 9999:80 --name wordpress --network inyaw -d wordpress:latest
+# 查看mysql的docker内网ip，好给wordpress配置
+docker inspect mysql | grep IPAddress
+# docker cp是左边复制到右边，下边这两句，是我从docker拷贝下来文件，修改后覆盖过去的操作
+docker cp wordpress:/usr/local/etc/php/php.ini /data/php.ini
+docker cp wordpress:/usr/local/etc/php/php.ini-production /data/php.ini
+```
+
+## 结语
+
+网上教程都太少了，就自己搞了下，还好，比较简单

@@ -1,0 +1,16 @@
+---
+title: "自定义 IDEA 的配置和插件目录"
+description: "把 config 和 plugins 从 C 盘挪走，重装系统不丢配置"
+---
+
+1.进入到idea的安装目录；
+
+2.找到“idea.properties”文件；
+
+3.修改：idea.config.path=$&#123;user.home&#125;/.IntelliJIdea/config”后的路径，为你想要使用的存放目录；
+
+4.修改：idea.plugins.path=$&#123;idea.config.path&#125;/plugins”后的路径，为你想要使用的存放目录；
+
+5.注意取消上面两条的“#”注释符；
+
+6.保存后，再次运行idea，所有配置和插件都将保存在指定的目录；

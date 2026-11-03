@@ -1,0 +1,37 @@
+---
+title: "Immich 配置留档"
+description: "当前在用的 compose 与环境变量存档"
+---
+
+```
+services:
+  immich:
+    container_name: immich
+    image: ghcr.io/immich-app/immich-server:release
+    volumes:
+      - /home/yuxh/Photos:/data/library
+      - /volume3/docker/immich/extlib:/extlib
+      - /volume3/docker/immich/geodata:/build/geodata
+      - /volume3/docker/immich/i18n-iso-countries/langs:/usr/src/app/server/node_modules/i18n-iso-countries/langs
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - UID=0
+      - GID=0
+      - PUID=0
+      - PGID=0
+      - TZ=Asia/Shanghai
+      - DB_HOSTNAME=192.168.5.5
+      - DB_PORT=5433
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=<已打码>
+      - REDIS_HOSTNAME=192.168.5.5
+      - REDIS_PORT=16379
+      - REDIS_PASSWORD=<已打码>
+    ports:
+      - '2283:2283'
+    restart: always
+    network_mode: bridge
+    healthcheck:
+      disable: false
+
+```

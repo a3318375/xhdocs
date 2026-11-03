@@ -1,0 +1,20 @@
+---
+title: "OpenJDK 的 slim 和 alpine 镜像"
+description: "体积、glibc 和时区的差别"
+---
+
+### Alpine：
+
+Linux发行版：Alpine Linux是一个轻量级、安全且易于维护的Linux发行版。  
+体积：由于其小巧的体积和快速的启动时间，Alpine Linux非常适合用于构建轻量级的Docker镜像。  
+包管理器：Alpine使用apk作为包管理器，这使得安装和更新软件包变得相对简单。  
+兼容性：需要注意的是，由于Alpine Linux使用musl libc而不是更常见的glibc，某些Java应用程序可能需要额外的配置或调整才能在这个环境中正常工作。
+
+### Slim：
+
+Linux发行版：Slim版本通常基于Debian的slim版本，它去除了许多不必要的组件，以减小镜像的大小。  
+体积：虽然slim版本的镜像比完整的Debian镜像要小，但它通常比基于Alpine Linux的镜像要大。  
+包管理器：Debian使用apt作为包管理器，这使得在slim版本的镜像中安装和更新软件包也相对方便。  
+兼容性：由于基于Debian，slim版本的镜像通常具有很好的兼容性，适用于大多数Java应用程序
+
+‍

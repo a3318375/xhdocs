@@ -1,0 +1,33 @@
+{
+  "title": "部署手册",
+  "pages": [
+    "openlist",
+    "litepan",
+    "tgtodrive",
+    "alist",
+    "komodo",
+    "dockge",
+    "gitea",
+    "drone",
+    "drone-pipeline",
+    "jenkins",
+    "immich",
+    "immich-remote",
+    "immich-storage",
+    "immich-config",
+    "homepage",
+    "affine",
+    "karakeep",
+    "pgvector",
+    "homeassistant",
+    "hermes",
+    "cloud-server-rebuild",
+    "openclash",
+    "wordpress",
+    "typecho",
+    "bypass-to-main-router",
+    "ont-bridge",
+    "spring-boot-admin",
+    "jellyfin-emby"
+  ]
+}

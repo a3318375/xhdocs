@@ -1,0 +1,37 @@
+---
+title: "Homepage"
+description: "导航页，靠容器 label 自动发现服务"
+---
+
+```
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+      - /home/yuxh/Music:/music:ro
+    network_mode: bridge
+    ports:
+      - 4533:4533
+    environment:
+      ND_DEFAULTLANGUAGE: zh-Hans
+      ND_ENABLEGRAVATAR: true
+      ND_ENABLETRANSCODINGCONFIG: false
+      ND_LASTFM_LANGUAGE: zh
+      ND_LASTFM_APIKEY: <已打码>
+      ND_LASTFM_SECRET: <已打码>
+      HTTP_PROXY: http://192.168.5.5:7890
+      HTTPS_PROXY: http://192.168.5.5:7890
+    labels:
+      - homepage.group=NAS
+      - homepage.name=Navidrome
+      - homepage.icon=navidrome.png
+      - homepage.href=http://navidrome.home/
+      - homepage.widget.type=navidrome
+      - homepage.widget.url=http://navidrome.home
+      - homepage.widget.user=a3318375
+      - homepage.widget.token=<已打码>
+      - homepage.widget.salt=yuxh
+```

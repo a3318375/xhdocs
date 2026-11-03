@@ -1,0 +1,79 @@
+---
+title: "Homelab 服务栈换血记录"
+description: "NAS 上换掉和冗余的服务，重点记当初为什么不用它"
+---
+
+记录 NAS（`192.168.5.3`，栈目录 `/volume3/docker/file/stacks/`）上**换掉/冗余但保留配置与数据**的服务，重点记**当初为什么不用它**——方便以后翻查，避免重复试错。
+
+栈的部署方：由 **Dockhand**（跑在 `192.168.5.5` 路由器上，容器 `dockhand`，数据落 NAS 的 PostgreSQL `5433/dockhand`）管理；栈文件在路由器 `/opt/dockerfile/dockhand/data/stacks/nas/<栈>/compose.yaml`，NAS 侧由 `hawser` 容器把 `/volume3/docker/file/stacks` 挂成 `/data/stacks`。**在 Dockhand 里删栈 = 两边目录里的 `compose.yaml` 一起消失。**
+
+备份规格：
+- **知识库快照（必做）**：`raw/configs/<name>-compose-<YYYYMMDD>.yaml`（raw frontmatter + body 与源文件逐字节一致 + sha256 自校验）
+- **NAS 现场副本（可选）**：`<stack>/compose.yaml.bak-<YYYYMMDD-HHMMSS>`（与源文件同目录，md5 一致）
+- 用户口径（2026-10-09）：**不要往 3 盘额外写备份副本**；服务配置归档进知识库即可。栈目录本身保留不删，恢复即 `docker compose up -d`
+- 用户口径（2026-10-16 修正）：现场副本会**随 Dockhand 删除一起消失**，所以「知识库快照」是唯一可靠留存；9-27 迁移前做过全量归档 `/volume3/backup/pre-cwnas-20260927-204407/volume3-docker-file.tar.zst`（29.8GB，含 `docker/file` 全部栈文件），可作为最后兜底
+
+## 服务清单
+
+### litepan（旧配置）
+- 镜像与入口：`ponphil/litepan:beta`，端口 `5211`；`privileged: true` + `/dev/fuse` + `pid: host`
+- 挂载：`litepan/data`、`stacks/emby/media/strm`（STRM 输出目录）、`litepan/mounts`
+- 接入网盘：115（`115_open` 驱动）、夸克（`quark` 驱动）
+- 快照：`raw/configs/litepan-compose-20261009.yaml`（sha256 `c63e3fd4…`）；NAS 副本 `compose.yaml.bak-20261009-102233`
+- **换掉的原因（2026-10-09 评估）**：
+  - **秒传能力很受限**：只有固定几个网盘之间可用，本质依赖 OpenList 驱动（跨盘不存在真正的秒传，只能实下载再上传）
+  - **STRM 生成与既有链路重叠**：`ani-rss → 115 → TgtoDrive(整理+STRM) → Emby` 已经在做，且更细（TMDB 正则、洗版、季集结构）
+  - 实测运行状态：Up 4 天期间日志只有定时认证刷新，**无任何整理/秒传活动**
+  - 结论：*"感觉功能不太实用"* → 评估为冗余，去留待定
+
+### openlist（已删除，2026-10-16）
+- 镜像与入口：`openlistteam/openlist:v4.2.3-aria2`（`user: 0:0`），端口 `5244`，`restart: unless-stopped`
+- 挂载：`stacks/openlist/data` → `/opt/openlist/data`（应用配置与索引库）；`/volume3/data` → `/data`（对外暴露的共享内容根）
+- 定位（删除前）：网盘聚合/挂载入口，替掉了 alist（同为 5244 端口）；也是 ani-rss 的 OpenList 模式落地端、litepan「秒传」能力所依赖的驱动层
+- 快照：`raw/configs/openlist-compose-20261016.yaml`（sha256 `f1d3a2c2…`）
+- **现状（2026-10-16，实测）**：用户已在 Dockhand 里删除该栈 —— NAS `docker ps -a` 无 `openlist` 容器，栈目录只剩 `data/`（`compose.yaml` 已随删除消失）；取出快照的唯一来源是 9-27 全量归档
+- **2026-10-16 追加**：用户指示删除残留 data（栈目录 `stacks/openlist/` 整目录 69M 已 `rm -rf`，含 `data.db` 索引与 `config.json`）；回退只能靠 9-27 归档
+- **删除原因：待用户补录**（原文只说「在 dockhand 里 openlist 和 tgtodriver 我都删了」）
+
+### alist（旧配置）
+- 镜像：`xhofe/alist:latest-aio`（`user: 0:0`），端口 `5244`，挂 `/volume3/docker/file/stacks/alist/data` 与 `/volume3/data`
+- 现状（2026-10-09 检查）：容器状态 **`Created`**（早已不再运行）；功能位由 **OpenList**（`openlistteam/openlist:v4.2.3-aria2`，同为 5244）承担
+- 快照：`raw/configs/alist-compose-20261009.yaml`（sha256 `9140baf7…`）；NAS 副本 `compose.yaml.bak-20261009-103031`
+- **换掉的原因（2026-10-09 口述）**：
+  - **优点**：支持一些**很稀少、不常见的网盘**——这是它相对 OpenList 的独特价值
+  - **换掉**：因 **AList 与 OpenList 之间的风波**（项目归属/维护争议）导致不再常用
+  - 即：淘汰原因是**生态/维护层面**，不是功能本身不行
+
+### tgtodrive（用户决定停用，2026-10-09）
+- 镜像与入口：`walkingd/tgto123:latest`（`network_mode: host`，`restart: always`），端口 `12366`
+- 挂载：`stacks/tgtodrive/db` → `/app/db`（配置 / SQLite / 日志）；`stacks/emby/media/strm` → `/app/strm`（STRM 输出目录）
+- 实测能力（2026-10-09，容器 `running`，配置目录共 36MB）：
+  - **115 网盘整理 + STRM 生成**：整理历史 `db/organize/organize_history.db`；手工 **TMDB 正则映射** `db/organize/tmdb_regex_rules.json`（长译名 / 类型误判的兜底，值钱的运维沉淀）
+  - 周边功能：TG 频道监控 `db/TG_monitor-{115,123,189,guangya}.db`、Telegram bot `db/bot/`、Emby 看板与邀请 `db/embydata/`、PT 转移 `db/pttransfer/`、签到 `re0/`+`hdhive/`、分享 STRM 失效清理 `toolbox/`、媒体发现库 `db/media_discovery.db`（26MB）
+  - 凭据与配置：`db/115_open_token.json`（115 网盘 token，重建需重新扫码登录）、`db/user.env`（66KB 主配置）、`db/user_session.session`、`db/flask/flask_secret_key.txt`
+- **播放耦合（停用前必须知道）**：STRM 内地址为 `http://192.168.5.3:12366/play115/...`，即**经本容器转发**；容器停掉后 Emby「115网盘」库的 **155 条 STRM 全部失效**（其余媒体库不受影响）
+- 快照：`raw/configs/tgtodrive-compose-20261009.yaml`（sha256 `e0f8d7cb…`）
+- NAS 现场副本：**未留**（用户 2026-10-09 明确要求「不要往 3 盘备份」）；原栈目录与 `db/` 未动，恢复 = 重新 `docker compose up -d`
+- **现状（2026-10-16，实测）**：已随开放列表一起在 **Dockhand 里删除** —— NAS `docker ps -a` 无 `tgtodrive` 容器，栈目录只剩 `db/ downloads/ strm/ transfer/`，`compose.yaml` 已消失。快照内容与 9-27 归档里那份 **sha256 完全一致**（`e0f8d7cb…`），说明 10-09 抓取的即最终版本
+- **2026-10-16 追加**：用户指示删除残留 data（`stacks/tgtodrive/` 整目录 127M 已 `rm -rf`，含 `db/media_discovery.db` 30M、`user.env`、115 token、`organize/`、`TG_monitor-*.db`）；回退只能靠 9-27 归档
+- **停用决定（2026-10-09）**：用户决定停用；**具体理由待补**（用户未说明）。技术位现状：它是当前唯一承担「115 整理 + STRM」的组件，与 litepan 的 STRM 生成能力重叠
+- 备注：`downloads/`、`strm/`、`transfer/` 三个挂载目录均为空
+
+## Practical takeaways
+- 三个服务的淘汰逻辑不同，别混为一谈：
+  - **litepan = 功能重叠 + 被驱动能力卡住**（技术性冗余，换个更强的整理器就能替代）
+  - **alist = 生态风波**（能力本身仍有价值，但社区/维护风险让它不值得继续押注）
+  - **tgtodrive = 用户决定停用（2026-10-09），理由待补**
+- 网盘挂载 + 聚合这类需求，当前统一由 **OpenList** 承担。
+- 整理 + STRM 生成这条链路，现状由 **TgtoDrive** 承担（`ani-rss → 115 → TgtoDrive(整理+STRM) → Emby`），与 litepan 的能力重叠。
+- 保留「能力清单 + 换掉的理由」比保留「服务本身」便宜：以后遇到稀有网盘需求时，翻这里就能判断要不要把 alist 拉回来试。
+
+## Open questions
+- alist 支持的那批稀有网盘，OpenList 是否已覆盖？若未覆盖，是否存在「只读保留 alist」的合理场景。
+- litepan 是否直接 `docker compose down` 下线，还是继续挂着观察。
+- **tgtodrive 停用后，`ani-rss → 115 → 整理/STRM → Emby` 的全自动链路由谁接？**（自建 Hermes + OpenList，还是不再需要自动入库）
+- tgtodrive 停用理由待用户补录。
+
+## Related
+- deploy-experience — 部署搭建经验汇总（Docker / 自建服务）
+- automated-media-pipeline — 自动化观影两条路线（本地 / 云端 STRM）

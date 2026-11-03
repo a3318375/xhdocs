@@ -1,0 +1,50 @@
+---
+title: "读写分离与分库分表"
+description: "什么时候该拆，拆了之后查询怎么办"
+---
+
+mysql的集群是主从复制
+
+要通过ShardingSphere-JDBC来分配读写。
+
+‍
+
+1主2从举例
+
+因为从库是只读的
+
+所以是ShardingSphere-JDBC配置2从来读，自动分配
+
+配置主库去写
+
+‍
+
+### 分表规则
+
+‍
+
+只说我了解的
+
+id拆分
+
+类似，id%4，这样，table_1: id1,   table_2: id2, table_3:  id3
+
+时间，没具体了解，但是可是设置每月之类的
+
+再就是雪花算法，算法本身可以包含表序列号
+
+在我追问下，ai给出了如下方案
+
+自定义分片算法（Class Based）
+
+```java
+// 你的自定义路由逻辑
+public String doSharding(Collection<String> availableTargetNames, PreciseShardingValue<Long> shardingValue) {
+    long id = shardingValue.getValue();
+    // 假设你从起始ID开始，每 50万 个 ID 换一张表
+    // 或者更简单的：(id - 起始ID) / 500000
+    long tableIndex = (id - START_ID) / 500000; 
+    return "resource_" + tableIndex;
+}
+
+```

@@ -1,0 +1,54 @@
+---
+title: "Immich 续集"
+description: "去掉 redis 和数据库、全部远程搭建时改的 compose 与环境变量"
+---
+
+所有东西都放在远程，本机只跑一个 immich 容器，所以官方四件套里的 redis 和 postgres 全部去掉，改用外面的连接串。
+
+## compose
+
+```yaml
+services:
+  immich:
+    container_name: immich
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    volumes:
+      - ./data:/data
+      - ${UPLOAD_LOCATION}:/extlib
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    ports:
+      - '2283:2283'
+    restart: always
+    network_mode: bridge
+    healthcheck:
+      disable: false
+```
+
+## .env
+
+```bash
+UID=0
+GID=0
+PUID=0
+PGID=0
+
+# 上传文件的落点
+UPLOAD_LOCATION=/home/yuxh/Photos
+
+# 数据库文件位置，网络盘不支持
+DB_DATA_LOCATION=./postgres
+
+TZ=Asia/Shanghai
+IMMICH_VERSION=release
+
+DB_URL=postgresql://root:<已打码>@192.168.5.5:5433/immich
+REDIS_URL=<已打码>
+```
+
+## 注意
+
+- 去掉 postgres 和 redis 之后，`DB_URL`、`REDIS_URL` 必须指向容器外面真实存在的实例，端口要能从容器里访问到。
+- `UPLOAD_LOCATION` 写的是宿主路径，挂进容器是 `/data`，改路径要两边一起改。
+- 环境变量改动只能靠重建容器生效，`docker restart` 不会重新读 `.env`。

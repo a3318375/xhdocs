@@ -1,0 +1,140 @@
+---
+title: "Java 面试题收集（一）"
+description: "集合、并发和 JVM 的常见问法"
+---
+
+# java基础
+
+## jvm、jdk、jre
+
+jvm是运行 Java 字节码的虚拟机  
+jdk是java的sdk，能够创建和编译 Java 程序的开发套件  
+jre是Java 运行时环境
+
+## 字节码
+
+.class就是字节码，面向jvm，可移植
+
+## 编译与解释并存
+
+Java 要先编译，后解释。Java生成的字节码（.class 文件）必须由 Java 解释器来解释执行。
+
+## AOT 和 JIT
+
+AOT 不支持反射、动态代理、动态加载、JNI（Java Native Interface）等。  
+spring现在的graalvm可以，但是编译时需要内存很大。
+
+## Oracle JDK 和 OpenJDK
+
+Oracle jdk是部分开源，并且收费，免费的也有限制。但是oracle提供LTS服务
+
+## java的注释
+
+java的注释分为单行注释、多行注释，和文档注释。
+
+## 标识符和关键字
+
+我们给程序变量取名字，就叫标识符。而关键字是被赋予特殊含义的标识符。
+
+## continue、break 和 return
+
+continue跳出一次循环  
+break结束整个循环  
+return结束方法
+
+## java的基本数据类型
+
+4 种整数型：byte、short、int、long  
+2 种浮点型：float、double  
+1 种字符类型：char  
+1 种布尔型：boolean
+
+## 自动装箱与拆箱
+
+装箱是让基本类型包装成引用类型  
+拆箱将引用类型转换为基本数据类型  
+Integer a = 1;  
+Integer b = new Integer(1);  
+二者不相等，因为a装箱引用了缓存。
+
+## 静态方法为什么不能调用非静态成员?
+
+静态方法加载的更早
+
+## 重载和重写
+
+重载是同方法不同参数  
+重写是对父类方法进行覆盖
+
+## 面向对象和面向过程的区别
+
+我的理解还是在于封装、继承、多态  
+面向对象会先抽象出对象，然后用对象执行方法的方式解决问题
+
+## 如果一个类没有声明构造方法能执行吗
+
+可以，会有默认的无参构造
+
+## 构造方法有哪些特点
+
+名字与类名相同，没有返回值，能重载不能重写
+
+## 接口和抽象类区别
+
+都不能被实例化，都可以包含抽象方法，都可以有默认实现的方法  
+接口会产生约束，实现接口必须实现方法。抽象类更多的是代码复用。  
+单继承多实现
+
+## 深拷贝和浅拷贝
+
+深拷贝会完全复制整个对象，包括这个对象所包含的内部对象，浅拷贝不会。
+
+## == 和 equals() 的区别
+
+==基本类型判断值，引用类型判断内存地址。  
+equals在Object里面，只能判断对象
+
+## 重写equals时必须重写hashCode
+
+两个相等的对象的 hashCode 值必须是相等，否则hashMap可能会出现问题
+
+## String、StringBuffer、StringBuilder
+
+String是final不可变，所以每次都是新对象  
+StringBuffer加了同步锁，保证了线程安全
+
+## String s1 = new String("abc");创建了几个字符串对象？
+
+如果字符串常量池中已存在字符串对象“abc”的引用，就是1个，否则2个。
+
+## String#intern 有什么用
+
+将指定的字符串对象的引用保存在字符串常量池中，一般是用来判断相等
+
+## Exception 和 Error
+
+Error是程序错误，无法处理
+
+## Throwable 的常用方法
+
+getMessage简述  
+toString详细信息  
+printStackTrace打印到控制台
+
+## finally和retrun
+
+当在 try 块或 catch 块中遇到 return 语句时，finally 语句块将在方法返回之前被执行。  
+当finally里有return的时候，try里的会被忽略。
+
+## try-with-resources
+
+try-with-resources用来关闭io流比较多。
+
+## 反射
+
+写公共方法比较多，反射可以获取任意一个类的所有属性和方法并使用。
+
+## 注解
+
+编译期直接扫描，比如@Override  
+运行期通过反射处理，不如spring的@value

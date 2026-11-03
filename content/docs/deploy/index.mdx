@@ -1,0 +1,49 @@
+---
+title: "部署手册"
+description: "NAS 上正在跑的服务栈、compose 快照与部署时的取舍"
+---
+
+一组可以照着复现的部署记录，一篇一个服务或一件事，给 compose 原文（账号密码已打码）、端口与挂载路径，以及当初为什么这么配。
+
+## 媒体与网盘
+
+- [OpenList](/docs/deploy/openlist) —— 网盘聚合 + 内置 aria2，离线下载的落点。
+- [LitePan](/docs/deploy/litepan) —— PikPak / 115 挂载与媒体整理，要 FUSE 和 host pid。
+- [TgtoDrive](/docs/deploy/tgtodrive) —— 生成 STRM 给 Emby，host 网络。
+- [AList](/docs/deploy/alist) —— 前身配置，端口和 OpenList 冲突。
+
+## 容器与发布
+
+- [Komodo](/docs/deploy/komodo) —— Postgres + FerretDB + Core + Periphery 整套。
+- [Dockge](/docs/deploy/dockge) —— compose 管理面板，stacks 路径必须左右一致。
+- [Gitea](/docs/deploy/gitea) —— 自建 Git。
+- [Drone](/docs/deploy/drone) —— server 与 runner。
+- [Drone 流水线](/docs/deploy/drone-pipeline) —— 从仓库授权到第一条流水线。
+- [Jenkins 和 Blue Ocean](/docs/deploy/jenkins) —— 容器化 Jenkins。
+
+## 应用
+
+- [Immich 搭建日记](/docs/deploy/immich) —— 官方 compose 四件套。
+- [Immich 续集](/docs/deploy/immich-remote) —— 跑起来之后的坑。
+- [Immich 从入门到跑路](/docs/deploy/immich-storage) —— 存储路径、外部库、备份。
+- [Immich 配置留档](/docs/deploy/immich-config) —— 当前在用的环境变量。
+- [Homepage](/docs/deploy/homepage) —— 导航页，靠容器 label 自动发现。
+- [AFFiNE](/docs/deploy/affine) —— 自建 AFFiNE。
+- [Karakeep](/docs/deploy/karakeep) —— 书签收藏。
+- [pgvector](/docs/deploy/pgvector) —— Postgres 向量库，给 RAG 用。
+- [Home Assistant](/docs/deploy/homeassistant) —— 智能家居。
+- [Hermes Agent](/docs/deploy/hermes) —— 目录结构与启动参数。
+
+## 服务器与网络
+
+- [云服务器重建流程](/docs/deploy/cloud-server-rebuild) —— 换机时从裸系统到服务全起来的顺序。
+- [OpenClash](/docs/deploy/openclash) —— 订阅、分流、内核。
+- [AlmaLinux 9 装 WordPress](/docs/deploy/wordpress) —— LNMP 从零到能访问。
+- [从 WordPress 转生 Typecho](/docs/deploy/typecho) —— 迁移与换主题。
+- [从旁路由到主路由](/docs/deploy/bypass-to-main-router) —— 拓扑变化与 DHCP 处理。
+- [光猫桥接与软路由拨号](/docs/deploy/ont-bridge) —— PPPoE 与回程路由。
+
+## 监控与选型
+
+- [Spring Boot Admin](/docs/deploy/spring-boot-admin) —— 给 Spring Boot 服务加监控面板。
+- [Jellyfin 和 Emby 的对比](/docs/deploy/jellyfin-emby) —— 硬解、刮削、客户端差异。

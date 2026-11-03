@@ -1,0 +1,38 @@
+---
+title: "TgtoDrive"
+description: "生成 STRM 给 Emby，host 网络，账号密码别写死在 compose 里"
+---
+
+把网盘里的片子整理成 STRM，Emby 只读 STRM 文件不碰原片。跑在宿主网络里，端口直接在程序里改。
+
+| 项 | 值 |
+| --- | --- |
+| 镜像 | `walkingd/tgto123:latest` |
+| 网络 | host（默认 12366） |
+| 数据 | `/volume3/docker/file/stacks/tgtodrive/db` |
+| 输出 | `/volume3/docker/file/stacks/emby/media/strm` |
+
+## compose
+
+```yaml
+services:
+  tgtodrive:
+    image: walkingd/tgto123:latest
+    container_name: tgtodrive
+    network_mode: host
+    environment:
+      TZ: Asia/Shanghai
+      ENV_WEB_PASSPORT: <用户名>
+      ENV_WEB_PASSWORD: <密码>
+    volumes:
+      - /volume3/docker/file/stacks/tgtodrive/db:/app/db
+      - /volume3/docker/file/stacks/emby/media/strm:/app/strm
+    restart: always
+```
+
+## 注意
+
+- `network_mode: host` 下端口映射写了也没用，改端口要去程序设置里改。
+- 账号密码别写死在 compose 里。放同目录 `.env`，这里写 `${ENV_WEB_PASSWORD}`，分享配置时把 `.env` 排除掉。
+- `db` 一定要挂出来，里面是任务记录和整理规则，不挂等于每次重建都从头来。
+- 生成 STRM 的目录要和 Emby 扫的是同一个宿主路径，否则 Emby 里一堆 404。

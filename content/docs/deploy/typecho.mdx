@@ -1,0 +1,22 @@
+---
+title: "从 WordPress 转生 Typecho"
+description: "迁移数据、换主题、改固定链接"
+---
+
+## 光速逃跑
+
+如你所见，是的，我跑路了，我各种方式搜了十几个组件，都在解析markdown的时候，出现了样式问题。我又不喜欢静态的，我甚至以为typecho也是静态的。
+
+后来发现，是的，我要用的就是这个！
+
+## 建表
+
+```sql
+CREATE DATABASE typecho
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_general_ci;
+```
+
+## docker启动
+
+​`docker run --name typecho --network inyaw -p 8888:80 -e TYPECHO_SITE_URL=https://www.inyaw.com -d joyqi/typecho:nightly-php8.2-apache`

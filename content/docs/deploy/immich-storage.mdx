@@ -1,0 +1,108 @@
+---
+title: "Immich 从入门到跑路"
+description: "存储路径、外部库和备份策略"
+---
+
+### 和传统nas相册对比
+
+#### 优点
+
+- 更美观的UI
+
+- 更好的流畅度
+- 地图展示更直观
+- 中文搜图
+- 远程机器学习
+- 按照模板存放
+
+#### 缺点
+
+- 部署麻烦，需要独立数据库
+- 会对硬盘写入非常频繁
+
+### 开始部署
+
+需要注意，`network_mode: bridge`是因为我是部署在软路由才这么写的，并且，为了共用数据库和redis。
+
+##### 独立部署数据库
+
+```yaml
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg18-trixie
+    container_name: postgres
+    restart: always
+    network_mode: bridge
+    ports:
+      - 5433:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: <已打码>
+```
+
+##### 独立部署redis
+
+```yaml
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    network_mode: bridge
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf --port 16379
+    ports:
+      - 16379:16379
+
+```
+
+##### immich部署
+
+```yaml
+services:
+  immich:
+    container_name: immich
+    image: ghcr.io/immich-app/immich-server:release
+    volumes:
+      - /home/yuxh/Photos:/data/library
+      - /volume3/docker/immich/extlib:/extlib
+      - /volume3/docker/immich/geodata:/build/geodata
+      - /volume3/docker/immich/i18n-iso-countries/langs:/usr/src/app/server/node_modules/i18n-iso-countries/langs
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - UID=0
+      - GID=0
+      - PUID=0
+      - PGID=0
+      - TZ=Asia/Shanghai
+      - DB_HOSTNAME=192.168.5.5
+      - DB_PORT=5433
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=<已打码>
+      - REDIS_HOSTNAME=192.168.5.5
+      - REDIS_PORT=16379
+      - REDIS_PASSWORD=<已打码>
+    ports:
+      - '2283:2283'
+    restart: always
+    network_mode: bridge
+    healthcheck:
+      disable: false
+```
+
+​`volume3`是指我的固态硬盘，这些你可以选择性的存放。
+
+##### 机器学习
+
+```yaml
+docker run -d --name imimich_ml --gpus all -v ./model-cache:/cache -p 3010:3003 -e NVIDIA_VISIBLE_DEVICES=all gchr.io/imimich-app/imimich-machine-learning:release-cuda
+```
+
+这个可以单独跑在其他电脑上，比如PC。
+
+### 跑路
+
+我发现我的固态温度总是非常的高，按理来说空闲状态，不应该有这么写入啊。后来发现是immich在运行，我想了想，觉得还是放弃immich，因为用这个的频率真的很低，传统nas相册也不是不行。
+
+在卸载之后，固态和cpu温度均低了4度所有。

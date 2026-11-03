@@ -1,13 +1,57 @@
 ---
-title: Hello World
-description: Your first document
+title: "全部文章"
+description: "折腾记录与踩坑笔记，一篇一个主题"
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+共 29 篇，加上部署手册里的 28 篇服务记录。侧边栏按写作顺序排列。
 
-## What is Next?
+## 服务器与 NAS
 
-<Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
-</Cards>
+- [绿联 NAS 重装 Debian 13](/docs/ugreen-nas-debian) —— 从成品 NAS 换到可检查的 Linux 服务器：为什么要换、迁移时怎么保住数据、以及风扇灯控和磁盘格式这些要自己接手的部分
+- [机械盘休眠与唤醒排查（Debian）](/docs/mechanical-disk-spindown-observability) —— 怎么确认机械盘到底有没有休眠、谁在把它唤醒，以及 hdparm + systemd 的持久化配置
+- [CentOS 下 OpenSSH 批量升级与历史漏洞](/docs/openssh-hardening) —— 系统扫出 1 个高危 + 7 个中危，全部指向版本过旧：用 RPM 批量升级修掉，附七个 CVE 的速查表
+- [Nacos Namespace 未授权访问漏洞](/docs/nacos-unauthorized-access) —— Nacos Namespace 存在未授权访问漏洞，可能造成配置信息泄露
+- [Homelab 服务栈换血记录](/docs/deprecated-homelab-stacks) —— 记录 NAS（192.168.5.3，栈目录 /volume3/docker/file/stacks/）上换掉/冗余但保留配置与数据的服务，重点记当初为什么不用它——方便以后…
+
+## 网络与代理
+
+- [从 Lucky 迁移到 Nginx：我的轻量级反向代理方案](/docs/lucky-to-nginx) —— 从 Lucky 切到 nginx-ui + Nginx 的过程记录，包含部署方式、DDNS 配置、腾讯云子账号权限和防火墙放行
+- [OpenWrt extroot overlay（192.168.5.5 双分区叠加）](/docs/openwrt-extroot-overlay) —— 路由器 192.168.5.5（ImmortalWrt 25.12.2，x86/64，J4125 迷你主机）
+
+## 媒体与自动化
+
+- [自动化观影：本地存储与云端 STRM 的两条路](/docs/automated-media-pipeline) —— 动手选工具之前，先想清楚一件事：你要的"最终形态"是什么？
+
+## CI 与构建
+
+- [一种不错的学习型个人开发者的持续集成方案：GitHub Action](/docs/github-action-ci-cd) —— 面向个人开发者的轻量级 CI/CD 方案，使用 GitHub Action 实现 Java 项目从代码提交到 Docker 部署的自动化流程
+
+## Spring / 后端
+
+- [Spring Security 自定义后台权限过滤的方案](/docs/spring-security-custom-authorization) —— 基于 Spring Security 实现自定义后台权限过滤的方案，使用 AuthorizationManager 和 FilterInvocationSecurityMetadataSource 进行动态 URL 权限匹配
+- [Spring Validation 参数校验](/docs/spring-validation) —— 分组校验、嵌套对象和自定义注解
+- [OAuth2 的几种应用场景](/docs/oauth2-scenarios) —— 授权码、密码、客户端凭证各用在哪
+- [JPA 使用总结](/docs/jpa-summary) —— 实体映射、级联和查询上踩过的坑
+- [JPA 懒加载那点事](/docs/jpa-lazy-loading) —— LazyInitializationException 的几种成因和解法
+- [Feign 重复调用与 JPA 反序列化](/docs/feign-jpa-deserialize) —— 一次请求发两遍、实体字段丢了的排查过程
+- [从 smart-doc 到自定义 API 管理](/docs/smart-doc-to-openapi) —— 解析 OpenAPI 文档，做自己的接口管理
+- [从 markdown-it 换到 MDX](/docs/markdown-it-to-mdx) —— 迁移时踩的语法和渲染问题
+- [MySQL 一些奇怪的坑](/docs/mysql-gotchas) —— 字符集、时区和隐式转换
+- [读写分离与分库分表](/docs/sharding-read-write) —— 什么时候该拆，拆了之后查询怎么办
+- [Java 面试题收集（一）](/docs/java-interview) —— 集合、并发和 JVM 的常见问法
+- [OpenJDK 的 slim 和 alpine 镜像](/docs/openjdk-slim-alpine) —— 体积、glibc 和时区的差别
+- [Java 里做 GeoIP 查询](/docs/java-geoip) —— 用 MaxMind 库把 IP 转成地区
+- [使用 PowerDesigner 从 MySQL 反向工程生成物理数据模型并优化展示](/docs/powerdesigner-reverse-engineering) —— 使用 PowerDesigner 从 MySQL 数据库反向生成物理数据模型（PDM），并批量替换中文注释、按模块分组、优化布局的完整流程
+
+## 工具与环境
+
+- [自定义 IDEA 的配置和插件目录](/docs/idea-config-dir) —— 把 config 和 plugins 从 C 盘挪走，重装系统不丢配置
+- [IDEA 代码生成插件](/docs/idea-codegen-plugin) —— 自己写一个生成器插件，少写点重复代码
+- [IDEA 莫名卡死的一次排查](/docs/idea-freeze) —— 卡在索引和插件上，最后是怎么定位的
+- [WSL 里装 Docker](/docs/wsl) —— 在 WSL 里跑 Docker，以及那些顺手要装的依赖
+- [提交时跳过 ESLint 校验](/docs/git-skip-eslint) —— husky 挡路的时候，怎么临时绕过
+- [acme.sh 用腾讯云 DNS 验证签证书](/docs/acme-tencent-dns) —— 泛域名证书自动续期，密钥走环境变量
+
+## 部署手册
+
+OpenList、LitePan、TgtoDrive、Komodo、Dockge、Drone、Gitea、Jenkins、Immich、Homepage、AFFiNE、Karakeep、pgvector、Home Assistant、Hermes、云服务器重建、OpenClash、WordPress、Typecho、软路由这些服务的部署记录，都在 [部署手册](/docs/deploy) 里，一篇一个服务。

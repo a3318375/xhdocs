@@ -1,0 +1,142 @@
+---
+title: "Immich 搭建日记"
+description: "官方 compose 四件套：server、learn、redis、postgres"
+---
+
+新鲜感还没过总要找点好玩的，immich算是比较知名的了。
+
+## 开始
+
+搭建方式是使用`docker-compose.yml`
+
+官方自带如下，总共分了4个部分，server、learn、redis、postgres
+
+```
+#
+# WARNING: To install Immich, follow our guide: https://docs.immich.app/install/docker-compose
+#
+# Make sure to use the docker-compose.yml of the current release:
+#
+# https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml
+#
+# The compose file on main may not be compatible with the latest release.
+
+name: immich
+
+services:
+  immich-server:
+    container_name: immich_server
+    image: ghcr.xiaoji.de/immich-app/immich-server:${IMMICH_VERSION:-release}
+    # extends:
+    #   file: hwaccel.transcoding.yml
+    #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
+    volumes:
+      # Do not edit the next line. If you want to change the media storage location on your system, edit the value of UPLOAD_LOCATION in the .env file
+      - /home/yuxh/Media/Image:/data
+      - ${UPLOAD_LOCATION}:/extlib
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    ports:
+      - '2283:2283'
+    depends_on:
+      - redis
+      - database
+    restart: always
+    healthcheck:
+      disable: false
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
+    # Example tag: ${IMMICH_VERSION:-release}-cuda
+    image: ghcr.xiaoji.de/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    # extends: # uncomment this section for hardware acceleration - see https://docs.immich.app/features/ml-hardware-acceleration
+    #   file: hwaccel.ml.yml
+    #   service: cpu # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference - use the `-wsl` version for WSL2 where applicable
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    restart: always
+    healthcheck:
+      disable: false
+
+  redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:8-bookworm@sha256:fea8b3e67b15729d4bb70589eb03367bab9ad1ee89c876f54327fc7c6e618571
+    healthcheck:
+      test: redis-cli ping || exit 1
+    restart: always
+
+  database:
+    container_name: immich_postgres
+    image: ghcr.xiaoji.de/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      # Uncomment the DB_STORAGE_TYPE: 'HDD' var if your database isn't stored on SSDs
+      # DB_STORAGE_TYPE: 'HDD'
+    volumes:
+      # Do not edit the next line. If you want to change the database storage location on your system, edit the value of DB_DATA_LOCATION in the .env file
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    restart: always
+
+volumes:
+  model-cache:
+
+```
+
+其中你要选择，要不要跑机器学习，如果不要，可以去掉immich-machine-learning， 因为多数都是在nas这种弱性能设备来安装，所以跑起来很难。
+
+然后就各显神通了，比如我用了`/home/yuxh/Media/Image:/data`来映射我本地图片上去。
+
+## 机器学习
+
+可以选择用PC来机器学习，大概思路就是，现在windows有wsl可以装linux，然后再装docker，去单独跑那个immich-machine-learning镜像，开放外部访问给immich。
+
+但是我看了下，有点麻烦，我选择直接安装Docker Desktop，基本一条龙就达成了。
+
+docker-compose.yml如下：
+
+```
+name: immich_remote_ml
+
+services:
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    # 如果需要硬件加速，可以在镜像标签中添加 -[armnn, cuda, openvino]
+    # 例如：${IMMICH_VERSION:-release}-cuda
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    # extends:
+    #   file: hwaccel.ml.yml
+    #   service: # 设置为 [armnn, cuda, openvino, openvino-wsl] 之一以启用加速推理
+    volumes:
+      - ./model-cache:/cache
+    environment:
+      - http_proxy=192.168.5.5:7890
+      - https_proxy=192.168.5.5:7890
+    restart: always
+    ports:
+      - 3003:3003
+
+volumes:
+  model-cache:
+```
+
+## 下载模型
+
+​`git clone https://huggingface.co/immich-app/buffalo_l`
+
+​`git clone https://huggingface.co/immich-app/XLM-Roberta-Large-Vit-B-16Plus`
+
+​`buffalo_l`​是人脸识别，`XLM-Roberta-Large-Vit-B-16Plus`是中文检索。
+
+yaml里，我们映射了model-cache目录，所以目录结构大概如下：
+
+‍
+
+‍

@@ -1,0 +1,81 @@
+---
+title: "Docker 里跑 Jenkins 和 Blue Ocean"
+description: "Jenkins 容器化部署，Blue Ocean 插件安装"
+---
+
+# 前言
+
+我其实之前一直很喜欢drone，因为那个go写的真的很轻量级。但是呢，那个对多模块项目支持不是很好。  
+这里要说一下，多模块只是有利于开源，在实际项目中并不是太好用。
+
+# 准备工作
+
+官方链接在这：[docker安装jenkins](https://www.jenkins.io/doc/book/installing/docker/)  
+开始前我们最大的问题是dockerhub下载不下来，国内镜像又无最新版，那么我们只能另想方案。  
+请看[此项目](https://github.com/a3318375/docker-pull-proxy)，这个项目也是我fork来的。简单说，就是目前github action可以既链接到国外，又可以链接到国内，通过github action把最新的镜像推送给腾讯云/阿里云的容器服务就好了。  
+这里就不细说了，腾讯云控制台搜【镜像仓库】就是了，先创建命名空间，然后还要登录啥的。  
+总共要下载2个，1是docker:bind，2是jenkins:2.461-jdk21.
+
+# 执行脚本
+
+这里更没啥好说的，照着官方的跑就好了。  
+当跑到Dockerfile的时候，会有个新问题，就是有些链接下载不下来，同时还少了点东西，那这里我们就稍微改造下，具体如下：
+
+```bash
+FROM ccr.ccs.tencentyun.com/inyaa/jenkins:2.461-jdk21
+USER root
+RUN apt-get update && apt-get install -y lsb-release
+RUN curl -fsSLo /usr/share/keyrings/docker-archive-keyring.asc \
+  http://mirrors.aliyun.com/docker-ce/linux/debian/gpg
+RUN echo "deb [arch=$(dpkg --print-architecture) \
+  signed-by=/usr/share/keyrings/docker-archive-keyring.asc] \
+  http://mirrors.aliyun.com/docker-ce/linux/debian \
+  $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+RUN apt-get update && apt-get install -y docker-ce-cli
+USER jenkins
+ENV JENKINS_UC_DOWNLOAD_URL https://mirrors.cloud.tencent.com/jenkins/plugins
+RUN jenkins-plugin-cli --plugins "blueocean docker-workflow json-path-api" \
+--jenkins-update-center=https://mirrors.cloud.tencent.com/jenkins/updates/update-center.json \
+--jenkins-plugin-info=https://mirrors.cloud.tencent.com/jenkins/updates/current/plugin-versions.json
+```
+
+好了，这下可以直接运行了。  
+顺便，最后一步也稍微改改
+
+```bash
+docker run \
+  --name jenkins-blueocean \
+  --restart=on-failure \
+  --detach \
+  --network jenkins \
+  --env DOCKER_HOST=tcp://docker:2376 \
+  --env DOCKER_CERT_PATH=/certs/client \
+  --env DOCKER_TLS_VERIFY=1 \
+  --publish 8080:8080 \
+  --publish 50000:50000 \
+  --volume /home/jenkins_home:/var/jenkins_home \
+  --volume /home/jenkins_cert:/certs/client:ro \
+  myjenkins-blueocean:2.461
+```
+
+主要是把几个目录放到了home下。
+
+# 跑不起来！
+
+遇到了如下问题  
+1.最后一步`--volume /home/jenkins_home:/var/jenkins_home`的权限问题
+
+```bash
+chown -R 1000 /home/jenkins_home
+chown -R 1000 /home/jenkins_cert
+```
+
+2.No such plugin: cloudbees-folder
+
+不知道为啥，就少了个插件，我这里手动加上了，下载地址[在这](https://updates.jenkins-ci.org/download/plugins/cloudbees-folder/)，点击permalink to the latest就好。  
+下载好后，我们手动放到`/home/jenkins_home/war/WEB-INF/detached-plugins`  
+然后对容器进行重启
+
+# 最后
+
+其实纠结了很久，要么太重了，要么功能不全，思来想后还是这个最好，但是收集到的知识又有点老，所以就研究了下。
