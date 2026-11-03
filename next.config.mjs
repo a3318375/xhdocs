@@ -6,6 +6,10 @@ const withMDX = createMDX();
 const config = {
   output: 'export',
   reactStrictMode: true,
+  // static export has no /_next/image optimizer endpoint -> emit plain <img>
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default withMDX(config);
